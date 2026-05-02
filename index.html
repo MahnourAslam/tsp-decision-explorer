@@ -1,0 +1,2585 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>TSP Decision Explorer — NP-Completeness, Brute Force, Nearest Neighbor & 2-Opt</title>
+  <style>
+    :root{
+      --bg:#0b1020;
+      --panel:rgba(255,255,255,0.05);
+      --panel2:rgba(255,255,255,0.035);
+      --stroke:rgba(255,255,255,0.12);
+      --text:#e8ecff;
+      --muted:#b7c0ff;
+      --city:#6aa9ff;
+      --exact:#ffd166;
+      --greedy:#64f0c8;
+      --opt:#c77dff;
+      --bad:#ff5c7a;
+      --edge:rgba(232,236,255,0.28);
+      --yes:rgba(100,240,200,0.72);
+      --no:rgba(255,92,122,0.82);
+      --inactive:rgba(255,255,255,0.10);
+    }
+    *{box-sizing:border-box}
+    html{scroll-behavior:smooth}
+    body{
+      margin:0;
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+      background:radial-gradient(1200px 800px at 18% 0%,#14204a 0%,var(--bg) 46%,#070a14 100%);
+      color:var(--text);
+      min-height:100vh;
+    }
+    h1{text-align:center;font-size:22px;font-weight:750;margin:18px 0 4px;letter-spacing:-.2px}
+    .subtitle{text-align:center;font-size:12px;color:var(--muted);margin:0 0 14px}
+    .wrap{max-width:1280px;margin:0 auto;padding:0 14px 18px;display:grid;grid-template-columns:420px 1fr;gap:14px}
+    @media(max-width:980px){.wrap{grid-template-columns:1fr}}
+    .card{
+      background:linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.03));
+      border:1px solid rgba(255,255,255,0.10);
+      border-radius:18px;
+      box-shadow:0 10px 30px rgba(0,0,0,0.25);
+      overflow:hidden;
+    }
+    .card h2{
+      margin:0;
+      padding:14px 14px 10px;
+      font-size:16px;
+      background:rgba(255,255,255,0.03);
+      border-bottom:1px solid rgba(255,255,255,0.08);
+    }
+    .controls{padding:12px 14px 14px}
+    label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
+    select,input[type="number"],input[type="range"],textarea,button{
+      width:100%;
+      border-radius:12px;
+      border:1px solid rgba(255,255,255,0.12);
+      background:rgba(0,0,0,0.20);
+      color:var(--text);
+      padding:10px 12px;
+      outline:none;
+      font-size:13px;
+    }
+    select option{background:#171d34;color:var(--text)}
+    textarea{
+      resize:vertical;
+      min-height:104px;
+      line-height:1.45;
+      font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono",monospace;
+    }
+    input[type="range"]{padding:10px 0}
+    button{
+      cursor:pointer;
+      font-weight:700;
+      background:rgba(106,169,255,0.14);
+      transition:transform .08s ease,background .12s ease,border-color .12s ease;
+    }
+    button:hover{background:rgba(106,169,255,0.22);border-color:rgba(106,169,255,0.30)}
+    button:active{transform:scale(0.99)}
+    button.secondary{background:rgba(255,255,255,0.08)}
+    button.secondary:hover{background:rgba(255,255,255,0.13)}
+    button.danger{background:rgba(255,92,122,0.18)}
+    button.danger:hover{background:rgba(255,92,122,0.26)}
+    button.iconBtn{display:flex;align-items:center;justify-content:center;gap:6px;min-height:40px}
+    .ico{font-size:13px;line-height:1}
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+    .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px}
+    .btnRow{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-top:10px}
+    .btnRow button{min-width:0;padding:10px 6px;font-size:clamp(11px,2.2vw,13px);white-space:normal;line-height:1.2}
+    @media(max-width:980px){.btnRow{grid-template-columns:repeat(3,minmax(0,1fr))}}
+    @media(max-width:520px){.btnRow{grid-template-columns:repeat(2,minmax(0,1fr))}}
+    .mb10{margin-bottom:10px}
+    .mt10{margin-top:10px}
+    .tiny{font-size:11px;color:var(--muted);line-height:1.45}
+    .speed-display{text-align:center;font-size:11px;color:var(--muted);margin-top:2px}
+    .segmented{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:10px}
+    .segmented button{padding:8px 5px;font-size:clamp(10px,2.1vw,11.5px);line-height:1.15;color:var(--muted);background:rgba(0,0,0,0.18)}
+    .segmented button.active{color:#fff;background:rgba(106,169,255,0.20);border-color:rgba(106,169,255,0.38)}
+    .stat{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.10)}
+    .pill{
+      border-radius:14px;
+      border:1px solid rgba(255,255,255,0.10);
+      background:rgba(0,0,0,0.18);
+      padding:10px 12px;
+      font-size:12px;
+      color:var(--muted);
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+    }
+    .pill b{color:var(--text);font-weight:800;text-align:right}
+    .pill.wide{grid-column:1/-1}
+    .validationBox{border-radius:14px;border:1px solid rgba(255,209,102,0.18);background:rgba(255,209,102,0.055);padding:10px 12px;font-size:12px;color:var(--text);line-height:1.5;margin:10px 0}
+    .validationBox.ok{border-color:rgba(100,240,200,0.18);background:rgba(100,240,200,0.045)}
+    .validationBox.error{border-color:rgba(255,92,122,0.24);background:rgba(255,92,122,0.07)}
+    .statusDot{width:9px;height:9px;border-radius:50%;display:inline-block;background:var(--inactive);box-shadow:0 0 0 3px rgba(255,255,255,0.04);margin-right:7px}
+    .statusDot.ready{background:var(--city)}
+    .statusDot.playing{background:var(--greedy)}
+    .statusDot.done{background:var(--exact)}
+
+    .intro-section{max-width:1280px;margin:0 auto 14px;padding:0 14px}
+    .intro-card{
+      background:linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.03));
+      border:1px solid rgba(255,255,255,0.10);
+      border-radius:18px;
+      box-shadow:0 10px 30px rgba(0,0,0,0.25);
+      overflow:hidden;
+    }
+    .intro-header{
+      padding:14px 18px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      cursor:pointer;
+      background:rgba(255,255,255,0.03);
+      border-bottom:1px solid rgba(255,255,255,0.08);
+    }
+    .intro-header h2{margin:0;font-size:16px}
+    .intro-toggle{width:auto;background:rgba(106,169,255,0.14);border:1px solid rgba(106,169,255,0.25);color:var(--city);border-radius:8px;padding:4px 12px;font-size:11px}
+    .intro-body{padding:18px 20px;line-height:1.7;font-size:13px;overflow:hidden;max-height:5000px;transition:max-height .35s ease,padding .35s ease}
+    .intro-body.collapsed{max-height:0;padding-top:0;padding-bottom:0}
+    .intro-body h3{font-size:15px;color:var(--city);margin:18px 0 6px}
+    .intro-body h3:first-child{margin-top:0}
+    .intro-body p{margin:0 0 12px;color:var(--text)}
+    .math-inline{display:inline-block;padding:1px 7px;background:rgba(106,169,255,0.08);border-radius:5px;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:13px;color:var(--city)}
+    .note-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:12px 0}
+    @media(max-width:900px){.note-grid{grid-template-columns:1fr}}
+    .note-box{border-radius:14px;border:1px solid rgba(255,255,255,0.10);background:rgba(0,0,0,0.16);padding:13px 14px;font-size:12.5px;line-height:1.55}
+    .note-title{font-weight:800;margin-bottom:4px}
+    .note-box.blue{border-color:rgba(106,169,255,0.18)} .note-box.blue .note-title{color:var(--city)}
+    .note-box.green{border-color:rgba(100,240,200,0.18)} .note-box.green .note-title{color:var(--greedy)}
+    .note-box.gold{border-color:rgba(255,209,102,0.18)} .note-box.gold .note-title{color:var(--exact)}
+    .note-box.red{border-color:rgba(255,92,122,0.22);background:rgba(255,92,122,0.055)} .note-box.red .note-title{color:var(--bad)}
+    .roadmap{background:linear-gradient(135deg,rgba(106,169,255,0.08),rgba(199,125,255,0.06));border:1px solid rgba(106,169,255,0.18);border-radius:14px;padding:16px 18px;margin-bottom:18px}
+    .roadmap-title{font-weight:850;font-size:14px;color:var(--city);margin-bottom:10px}
+    .roadmap-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:8px;font-size:12px}
+    .roadmap-grid a{text-decoration:none;color:var(--text);padding:8px 12px;background:rgba(0,0,0,0.15);border-radius:10px;border:1px solid rgba(255,255,255,0.08);transition:border-color .15s,background .15s}
+    .roadmap-grid a:hover{border-color:rgba(106,169,255,0.42);background:rgba(106,169,255,0.08)}
+    .roadmap-grid b{margin-right:5px}
+    .proof-section{
+      margin-top:12px;
+      border-radius:14px;
+      border:1px solid rgba(199,125,255,0.18);
+      background:rgba(199,125,255,0.045);
+      padding:14px 16px;
+    }
+    .proof-section h3{color:var(--opt);margin-top:0}
+    .proof-tabs{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin:12px 0}
+    @media(max-width:760px){.proof-tabs{grid-template-columns:1fr 1fr}}
+    .proof-tab{padding:8px 6px;border-radius:10px;border:1px solid rgba(255,255,255,0.10);background:rgba(0,0,0,0.18);color:var(--muted);font-size:11.5px;font-weight:800;cursor:pointer}
+    .proof-tab.active{background:rgba(199,125,255,0.18);border-color:rgba(199,125,255,0.35);color:#fff}
+    .proof-panel{display:none;border-radius:12px;border:1px solid rgba(255,255,255,0.10);background:rgba(0,0,0,0.16);padding:13px 14px;line-height:1.65}
+    .proof-panel.active{display:block}
+    .proof-subhead{font-weight:850;color:var(--exact);margin:10px 0 4px}
+    .proof-notation{border:1px solid rgba(106,169,255,0.16);background:rgba(106,169,255,0.055);border-radius:10px;margin:6px 0 10px;padding:0 10px}
+    .proof-notation summary{cursor:pointer;color:var(--city);font-weight:800;padding:7px 0;font-size:12px}
+    .proof-notation p{margin:0 0 9px}
+    .proof-code{display:block;white-space:pre-wrap;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;background:rgba(0,0,0,0.24);border:1px solid rgba(255,255,255,0.10);border-radius:10px;padding:10px 12px;margin:8px 0;color:#e8ecff;font-size:12px;line-height:1.55}
+    .proof-grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:10px 0}
+    @media(max-width:760px){.proof-grid2{grid-template-columns:1fr}}
+    .proof-flow{display:grid;grid-template-columns:1fr auto 1fr auto 1fr;gap:8px;align-items:center;margin:12px 0}
+    .proof-card{border:1px solid rgba(255,255,255,0.10);background:rgba(0,0,0,0.18);border-radius:12px;padding:10px 12px;min-height:84px}
+    .proof-card b{color:var(--text)}
+    .proof-arrow{color:var(--muted);font-size:18px;text-align:center}
+    .reductionSvg{width:100%;height:150px;border-radius:12px;background:rgba(0,0,0,0.18);border:1px solid rgba(255,255,255,0.10);margin:10px 0}
+    @media(max-width:760px){.proof-flow{grid-template-columns:1fr}.proof-arrow{transform:rotate(90deg)}}
+    .proof-mini{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+    @media(max-width:760px){.proof-mini{grid-template-columns:1fr}}
+    .miniSvg{height:210px;border-radius:12px;background:rgba(0,0,0,0.18);border:1px solid rgba(255,255,255,0.10)}
+    .proof-step-list{margin:8px 0 0;padding-left:18px}
+    .proof-step-list li{margin:6px 0}
+    .proof-converter{margin-top:12px;border-radius:14px;border:1px solid rgba(106,169,255,0.16);background:rgba(106,169,255,0.045);padding:13px 14px}
+    .proof-controls{display:grid;grid-template-columns:1fr 1fr auto;gap:8px;margin:10px 0}
+    @media(max-width:760px){.proof-controls{grid-template-columns:1fr 1fr}}
+    .proofControlsMain{display:none}
+    .proofMode .proofControlsMain{display:block}
+    .proofMode .algorithmControls{display:none}
+    .proofMode #comparisonGrid{display:none}
+    .proofMode #approxPanel{display:none!important}
+    .proofMode #compareConceptPanel{display:none!important}
+    .proof-explain{border-radius:12px;border:1px solid rgba(255,255,255,0.10);background:rgba(0,0,0,0.18);padding:12px 13px;font-size:12.5px;line-height:1.6}
+    .proof-progress{display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:12px;font-weight:800}
+    .proof-step-list li.active{color:#fff;background:rgba(255,209,102,0.10);border-left:3px solid var(--exact);padding-left:8px;border-radius:6px}
+
+    .viz{padding:14px;display:flex;flex-direction:column;gap:12px}
+    .vizTop{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+    .modeTitle{font-size:15px;font-weight:800}
+    .phaseNote{font-size:12px;color:var(--muted);line-height:1.45}
+    .legend{display:flex;flex-wrap:wrap;gap:10px;font-size:12px;color:var(--muted);align-items:center}
+    .dot{width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:6px;border:1px solid rgba(255,255,255,0.18)}
+    .svgFrame{
+      background:rgba(0,0,0,0.18);
+      border:1px solid rgba(255,255,255,0.10);
+      border-radius:16px;
+      overflow:hidden;
+      position:relative;
+    }
+    svg{display:block;width:100%}
+    .graphSvg{height:470px}
+    .growthSvg{height:260px}
+    .cityNode{fill:rgba(18,30,64,0.96);stroke:rgba(106,169,255,0.98);stroke-width:3}
+    .cityNode.active{fill:rgba(82,61,22,0.98);stroke:rgba(255,209,102,0.98)}
+    .cityLabel{fill:#fff;font:850 13px system-ui;text-anchor:middle;dominant-baseline:middle;paint-order:stroke;stroke:rgba(0,0,0,.65);stroke-width:3px;stroke-linejoin:round}
+    .edgeLine{stroke:var(--edge);stroke-width:1.2}
+    .tourSegment,.edgeState{stroke-width:4;stroke-linecap:round;filter:drop-shadow(0 0 6px rgba(255,209,102,.22))}
+    .tourSegment.exact{stroke:var(--exact)}
+    .tourSegment.greedy{stroke:var(--greedy);stroke-dasharray:8 5}
+    .tourSegment.opt{stroke:var(--opt);stroke-dasharray:3 6}
+    .edgeState.candidate{stroke:var(--city);stroke-width:5;stroke-dasharray:5 5;filter:drop-shadow(0 0 8px rgba(106,169,255,.35))}
+    .edgeState.current{stroke:var(--exact);stroke-width:6;filter:drop-shadow(0 0 10px rgba(255,209,102,.38))}
+    .edgeState.accepted{stroke:var(--greedy);stroke-width:5;filter:drop-shadow(0 0 8px rgba(100,240,200,.35))}
+    .edgeState.rejected{stroke:var(--bad);stroke-width:5;stroke-dasharray:4 6;filter:drop-shadow(0 0 8px rgba(255,92,122,.32))}
+    .weightLabel{fill:rgba(232,236,255,0.46);font:650 10.5px ui-monospace,SFMono-Regular,Menlo,monospace;text-anchor:middle;paint-order:stroke;stroke:rgba(0,0,0,.78);stroke-width:3px;stroke-linejoin:round}
+    .edgeStateLabelBg{fill:rgba(7,10,20,.86);stroke:rgba(255,255,255,.16);stroke-width:1}
+    .edgeStateLabel{fill:#fff;font:850 11.5px system-ui;text-anchor:middle;dominant-baseline:middle}
+    .emptyText{fill:var(--muted);font:700 14px system-ui;text-anchor:middle}
+    .comparisonGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+    @media(max-width:900px){.comparisonGrid{grid-template-columns:1fr}}
+    .compareCard{border-radius:14px;border:1px solid rgba(255,255,255,0.10);background:rgba(0,0,0,0.18);padding:12px}
+    .compareCard h3{margin:0 0 6px;font-size:13px}
+    .compareValue{font-size:24px;font-weight:850;margin:4px 0}
+    .compareMeta{font-size:12px;color:var(--muted);line-height:1.45}
+    .approxPanel{display:none;border-radius:14px;border:1px solid rgba(199,125,255,0.18);background:rgba(199,125,255,0.055);padding:12px 14px;font-size:12.5px;line-height:1.6}
+    .approxPanel h3{margin:0 0 6px;color:var(--opt);font-size:13px}
+    .approxPanel p{margin:6px 0;color:var(--text)}
+    .compareConceptPanel{display:none;border-radius:14px;border:1px solid rgba(106,169,255,0.18);background:rgba(106,169,255,0.045);padding:12px 14px;font-size:12.5px;line-height:1.6}
+    .compareConceptPanel h3{margin:0 0 6px;color:var(--city);font-size:13px}
+    .compareConceptPanel p{margin:6px 0;color:var(--text)}
+    .badge{display:inline-flex;align-items:center;gap:6px;padding:3px 8px;border-radius:999px;font-size:11px;font-weight:800;border:1px solid rgba(255,255,255,0.10);background:rgba(255,255,255,0.06)}
+    .badge.yes{color:var(--greedy);border-color:rgba(100,240,200,0.22);background:rgba(100,240,200,0.08)}
+    .badge.no{color:var(--bad);border-color:rgba(255,92,122,0.22);background:rgba(255,92,122,0.08)}
+    .panelGrid{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start}
+    .panelGrid>div{min-width:0}
+    @media(max-width:900px){.panelGrid{grid-template-columns:1fr}}
+    .spanFull{grid-column:1/-1}
+    .mono{
+      font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;
+      font-size:12px;
+      color:rgba(232,236,255,0.95);
+      line-height:1.45;
+      background:rgba(0,0,0,0.22);
+      border:1px solid rgba(255,255,255,0.10);
+      border-radius:14px;
+      padding:12px;
+      overflow:auto;
+      max-height:430px;
+    }
+    .codeLine{padding:2px 6px;border-radius:6px;white-space:pre;transition:background .15s,border-left .15s,box-shadow .15s}
+    .codeLine.active{background:rgba(255,209,102,0.28);border-left:4px solid rgba(255,209,102,0.8);box-shadow:inset 0 0 0 9999px rgba(255,209,102,0.05)}
+    .algorithmAnalysis{
+      padding:0;
+      margin-top:10px;
+      font-size:12px;
+      line-height:1.55;
+      color:var(--text);
+    }
+    .analysisGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:8px}
+    @media(max-width:760px){.analysisGrid{grid-template-columns:1fr}}
+    .analysisItem{border-radius:14px;border:1px solid rgba(255,255,255,0.10);background:rgba(0,0,0,0.16);padding:13px 14px}
+    .analysisItem b{display:block;margin-bottom:3px;color:var(--text)}
+    .analysisItem.blue{border-color:rgba(106,169,255,0.18);background:rgba(106,169,255,0.045)} .analysisItem.blue b{color:var(--city)}
+    .analysisItem.green{border-color:rgba(100,240,200,0.18);background:rgba(100,240,200,0.045)} .analysisItem.green b{color:var(--greedy)}
+    .analysisItem.gold{border-color:rgba(255,209,102,0.18);background:rgba(255,209,102,0.050)} .analysisItem.gold b{color:var(--exact)}
+    .analysisItem.purple{border-color:rgba(199,125,255,0.18);background:rgba(199,125,255,0.050)} .analysisItem.purple b{color:var(--opt)}
+    .explain{
+      border-radius:14px;
+      border:1px solid rgba(100,240,200,0.14);
+      background:rgba(100,240,200,0.045);
+      padding:12px 14px;
+      font-size:12.5px;
+      line-height:1.6;
+      color:var(--text);
+      min-height:72px;
+    }
+    .matrixWrap{overflow:auto;border-radius:14px;border:1px solid rgba(255,255,255,0.10);background:rgba(0,0,0,0.16);max-height:430px;max-width:100%;width:100%}
+    table{width:max-content;min-width:100%;border-collapse:collapse;font-size:12px}
+    th,td{padding:7px 8px;text-align:center;border-bottom:1px solid rgba(255,255,255,0.06);white-space:nowrap}
+    th{color:var(--muted);font-weight:800;background:#111522}
+    tbody th{position:sticky;left:0;z-index:1}
+    thead th{position:sticky;top:0;z-index:2}
+    thead th:first-child{left:0;z-index:3}
+    td{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+    .matrixCell{transition:background .16s,box-shadow .16s,color .16s}
+    .matrixCell.highlight-candidate{background:rgba(106,169,255,0.18);box-shadow:inset 0 0 0 2px rgba(106,169,255,0.55);color:#fff}
+    .matrixCell.highlight-current{background:rgba(255,209,102,0.22);box-shadow:inset 0 0 0 2px rgba(255,209,102,0.70);color:#fff}
+    .matrixCell.highlight-accepted{background:rgba(100,240,200,0.18);box-shadow:inset 0 0 0 2px rgba(100,240,200,0.55);color:#fff}
+    .matrixCell.highlight-rejected{background:rgba(255,92,122,0.18);box-shadow:inset 0 0 0 2px rgba(255,92,122,0.60);color:#fff}
+    .footerNote{max-width:1280px;margin:0 auto 18px;padding:0 14px;color:var(--muted);font-size:11.5px;line-height:1.55}
+    ::-webkit-scrollbar{width:6px;height:6px}
+    ::-webkit-scrollbar-track{background:transparent}
+    ::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.14);border-radius:3px}
+  </style>
+</head>
+<body>
+  <h1>TSP Decision Explorer</h1>
+  <p class="subtitle">NP-Completeness, Brute Force, Nearest Neighbor, and 2-Opt · Interactive Algorithms I teaching tool</p>
+
+  <section class="intro-section">
+    <div class="intro-card">
+      <div class="intro-header" id="lectureHeader">
+        <h2>Lecture Notes — Start Here</h2>
+        <button class="intro-toggle" id="lectureToggle">Collapse</button>
+      </div>
+      <div class="intro-body" id="lectureBody">
+        <div class="roadmap">
+          <div class="roadmap-title">Learning Roadmap</div>
+          <div class="roadmap-grid">
+            <a href="#tsp-sec1"><b style="color:#6aa9ff;">1.</b> The Problem — What is TSP?</a>
+            <a href="#tsp-sec2"><b style="color:#64f0c8;">2.</b> Decision Version — What are we deciding?</a>
+            <a href="#tsp-sec3"><b style="color:#ffd166;">3.</b> Exact Search — Why brute force grows</a>
+            <a href="#tsp-sec4"><b style="color:#c77dff;">4.</b> Heuristics — Greedy and 2-Opt</a>
+            <a href="#tsp-sec5"><b style="color:#6aa9ff;">5.</b> Worked Example — Verify a certificate</a>
+            <a href="#tsp-sec6"><b style="color:#ff5c7a;">6.</b> Counterexample — Greedy can fail</a>
+            <a href="#tsp-sec7"><b style="color:#ffd166;">7.</b> Counterexample — 2-Opt can stop early</a>
+            <a href="#tsp-sec8"><b style="color:#64f0c8;">8.</b> Trade-offs — Exact, Greedy, and 2-Opt</a>
+            <a href="#proof"><b style="color:#c77dff;">9.</b> NP-Completeness Proof</a>
+            <a href="#comparisonGrid"><b style="color:#64f0c8;">10.</b> Interactive Compare Mode</a>
+          </div>
+        </div>
+
+        <h3 id="tsp-sec1">1. What is the Traveling Salesman Problem?</h3>
+        <p>
+          TSP Decision asks whether there is one closed route through all cities whose total cost is at most a given
+          bound <span class="math-inline">B</span>: start at a city, visit every other city exactly once, and return to the start.
+        </p>
+        <p class="tiny"><b>Hint:</b> A cycle is a route that comes back to where it started; a TSP tour is a cycle through all cities.</p>
+        <div class="note-grid">
+          <div class="note-box blue">
+            <div class="note-title">Real-world idea</div>
+            Delivery routes, school bus routes, warehouse picking paths, and road-trip planning all have the same flavor: many stops, one route, limited travel.
+          </div>
+          <div class="note-box green">
+            <div class="note-title">Computer science idea</div>
+            TSP is a model for sequencing tasks: order the visits so the total cost is small. The “cities” can be physical locations, jobs, or states in a system.
+          </div>
+          <div class="note-box gold">
+            <div class="note-title">Why it is hard</div>
+            The number of possible tours grows very quickly. A route problem that looks small can become too large for exact checking.
+          </div>
+        </div>
+
+        <h3 id="tsp-sec2">2. The decision version of TSP</h3>
+        <p>
+          TSP is often written in two forms. The <b>optimization version</b> asks: “what is the cheapest possible
+          tour?” The <b>decision version</b> asks a yes/no question instead: “is there a tour cheap enough for this
+          given bound?” NP-completeness proofs use the decision version because complexity classes like
+          <span class="math-inline">NP</span> are about yes/no problems.
+        </p>
+        <p>
+          So in this tool, the input gives a complete weighted graph and a bound <span class="math-inline">B</span>.
+          We ask: <b>is there a TSP tour with total cost ≤ B?</b> A valid TSP tour has Hamiltonian structure: it visits every city exactly once before returning to the start.
+        </p>
+        <div class="note-grid">
+          <div class="note-box blue">
+            <div class="note-title">Key Concept: Instance</div>
+            One full input to the decision problem: a complete weighted graph on <span class="math-inline">n</span> cities plus a bound <span class="math-inline">B</span>.
+          </div>
+          <div class="note-box green">
+            <div class="note-title">Key Concept: Certificate</div>
+            A proposed TSP tour, such as <span class="math-inline">A → C → D → B → A</span>.
+          </div>
+          <div class="note-box gold">
+            <div class="note-title">Key Concept: Verifier</div>
+            Check the list length, make sure every city appears exactly once, add the tour edge weights, and compare the total with <span class="math-inline">B</span>.
+          </div>
+        </div>
+
+        <h3 id="tsp-sec3">3. Why exact search grows so fast</h3>
+        <p>
+          The most direct exact algorithm is <b>brute force</b>. It solves TSP by trying every possible city order,
+          computing the full tour cost, and keeping the best one. That is why it is useful as the truth benchmark:
+          if it checks every tour, the best one it finds really is optimal.
+        </p>
+        <p>
+          But the price is growth. If we fix the starting city, there are roughly
+          <span class="math-inline">(n - 1)!</span> tours. This is why the tool includes a growth chart: for small
+          <span class="math-inline">n</span>, exact solving feels fine; for larger <span class="math-inline">n</span>,
+          the number of tours becomes the main story.
+        </p>
+
+        <h3 id="tsp-sec4">4. Heuristics are helpful, but not proof</h3>
+        <p>
+          When exact search becomes too expensive, we use <b>heuristics</b>: practical algorithms that try to find
+          good tours quickly. Nearest Neighbor is a greedy heuristic: from the current city, go to the closest
+          unvisited city. Greedy + 2-Opt starts with that greedy tour, then improves it by swapping edges when a
+          swap saves distance.
+        </p>
+        <p>
+          These methods are useful, but they are not proof. For the decision problem, a heuristic tour with cost
+          greater than <span class="math-inline">B</span> does <b>not</b> prove the answer is no. Only an exact method
+          or a formal proof can settle every case.
+        </p>
+        <div class="note-grid">
+          <div class="note-box blue">
+            <div class="note-title">Key Concept: 2-Opt swap</div>
+            Pick two non-adjacent tour edges, such as <span class="math-inline">(a,b)</span> and <span class="math-inline">(c,d)</span>. Remove them, then reconnect as <span class="math-inline">(a,c)</span> and <span class="math-inline">(b,d)</span>. This reverses the middle part of the route.
+          </div>
+          <div class="note-box green">
+            <div class="note-title">Key Concept: Delta</div>
+            <span class="math-inline">delta</span> means change in cost: <span class="math-inline">new edge cost - old edge cost</span>. A negative delta means the new route is shorter.
+          </div>
+          <div class="note-box gold">
+            <div class="note-title">Accept rule</div>
+            If <span class="math-inline">delta &lt; 0</span>, keep the swap and continue improving. If <span class="math-inline">delta ≥ 0</span>, reject it. Repeat until no improving swap is found.
+          </div>
+        </div>
+
+        <h3 id="tsp-sec5">5. Worked example: checking one certificate</h3>
+        <p>
+          Suppose the cities are <span class="math-inline">A,B,C,D</span>, the bound is <span class="math-inline">B=1000</span>,
+          and someone gives the certificate <span class="math-inline">A → B → C → D → A</span>. The verifier does not search
+          for a better tour. It only checks this proposed tour: every city appears exactly once, the return to
+          <span class="math-inline">A</span> is included, and the four edge costs are added. If the sum is at most
+          <span class="math-inline">1000</span>, this certificate proves the instance is YES.
+        </p>
+
+        <h3 id="tsp-sec6">6. Counterexample: Greedy is not always optimal</h3>
+        <div class="note-grid">
+          <div class="note-box red">
+            <div class="note-title">Claim being disproved</div>
+            The claim is: “Choosing the nearest unvisited city always gives the optimal TSP tour.” The Greedy Trap preset is a counterexample to that claim.
+          </div>
+          <div class="note-box green">
+            <div class="note-title">Greedy Trap preset</div>
+            Starting at <span class="math-inline">A</span>, Nearest Neighbor chooses locally closest cities and gets <span class="math-inline">A-F-D-E-B-C-A</span> with cost <span class="math-inline">1221</span>.
+            <div class="tiny mt10">Try it: select <b>Greedy Trap</b>, choose <b>Greedy</b>, then click <b>Build Steps</b>.</div>
+          </div>
+          <div class="note-box gold">
+            <div class="note-title">Exact comparison</div>
+            Brute force checks all tours and finds <span class="math-inline">A-D-E-B-C-F-A</span> with cost <span class="math-inline">1098</span>. Greedy is <span class="math-inline">123</span> cost units worse, so the nearest-neighbor rule is fast but not always optimal.
+            <div class="tiny mt10">Then switch to <b>Compare</b> to see the exact gap side by side.</div>
+          </div>
+        </div>
+
+        <h3 id="tsp-sec7">7. Counterexample idea: 2-Opt can stop too early</h3>
+        <div class="note-grid">
+          <div class="note-box blue">
+            <div class="note-title">What 2-Opt is allowed to change</div>
+            2-Opt is local search. It looks at two tour edges, removes them, reconnects the route, and keeps the change only if the tour gets shorter.
+          </div>
+          <div class="note-box red">
+            <div class="note-title">Where the trap happens</div>
+            A tour can be <b>2-optimal</b>, meaning no single 2-edge swap improves it, but still not be globally optimal. It is like standing in a small valley: every nearby step goes uphill, even though a deeper valley exists farther away.
+          </div>
+          <div class="note-box gold">
+            <div class="note-title">What this teaches</div>
+            2-Opt tests many local repairs, not every possible tour. So “no improving 2-Opt swap remains” means <b>local optimum</b>, not “proof of best possible tour.”
+          </div>
+        </div>
+        <p class="tiny">
+          This local-search trap idea is discussed in the CS StackExchange explanation of why 2-Opt is not always optimal, and formal difficult examples are constructed by Papadimitriou and Steiglitz in <i>Some Examples of Difficult Traveling Salesman Problems</i>.
+        </p>
+
+        <h3 id="tsp-sec8">8. Advantages and disadvantages</h3>
+        <div class="note-grid">
+          <div class="note-box gold">
+            <div class="note-title">Brute Force</div>
+            <b>Advantage:</b> exact. It finds the true best tour for small <span class="math-inline">n</span>.<br>
+            <b>Disadvantage:</b> factorial growth. After fixing the start city, it still checks <span class="math-inline">(n-1)!</span> tours.
+          </div>
+          <div class="note-box green">
+            <div class="note-title">Nearest Neighbor</div>
+            <b>Advantage:</b> fast and simple greedy construction. It quickly gives a complete tour.<br>
+            <b>Disadvantage:</b> local choices can trap it. A close next city may force an expensive route later.
+          </div>
+          <div class="note-box blue">
+            <div class="note-title">Nearest Neighbor + 2-Opt</div>
+            <b>Advantage:</b> improves the greedy tour by replacing two bad edges when the swap saves cost.<br>
+            <b>Disadvantage:</b> still local search. Stopping means no 2-edge improvement remains, not proof of global optimum.
+          </div>
+        </div>
+
+        <div class="proof-section" id="proof">
+          <h3>Dedicated NP-Completeness Proof Section</h3>
+          <div class="proof-tabs" aria-label="NP-completeness proof tabs">
+            <button class="proof-tab active" data-proof="definition">1. Definition</button>
+            <button class="proof-tab" data-proof="np">2. In NP</button>
+            <button class="proof-tab" data-proof="reduction">3. Reduction</button>
+            <button class="proof-tab" data-proof="directions">4. Why it works</button>
+            <button class="proof-tab" data-proof="edgecases">5. Edge Cases</button>
+          </div>
+          <div class="proof-panel active" id="proof-definition">
+            <div class="proof-subhead">Formal language version</div>
+            <details class="proof-notation">
+              <summary>Notations used in this tab</summary>
+              <p><span class="math-inline">G=(V,E)</span>: <span class="math-inline">G</span> is the graph, <span class="math-inline">V</span> is the set of vertices/cities, and <span class="math-inline">E</span> is the set of edges/connections.</p>
+              <p><span class="math-inline">|V|=n</span>: the graph has <span class="math-inline">n</span> cities. <span class="math-inline">w(u,v)</span>: the cost or distance between cities <span class="math-inline">u</span> and <span class="math-inline">v</span>. <span class="math-inline">B</span>: the maximum cost allowed for a YES answer.</p>
+            </details>
+            <p><b>Problem P:</b> <span class="math-inline">TSP-DECISION = {⟨G,w,B⟩ : G is a complete graph and there exists a TSP tour T with cost(T) ≤ B}</span>.</p>
+            <p>Here <span class="math-inline">G=(V,E)</span>, <span class="math-inline">|V|=n</span>, and <span class="math-inline">w(u,v)</span> is the edge cost. A valid TSP tour has Hamiltonian structure: start at one city, visit every city exactly once, then return to the start.</p>
+            <div class="proof-subhead">Plain-English version</div>
+            <p>We are not asking “what is the shortest tour?” yet. The decision question is simpler: <b>is there at least one valid tour whose total cost is at most B?</b> That yes/no form is what belongs in NP-completeness proofs.</p>
+            <div class="proof-grid2">
+              <div class="proof-card"><b>Input</b><br>Complete weighted graph + bound <span class="math-inline">B</span>.</div>
+              <div class="proof-card"><b>Output</b><br><span class="math-inline">YES</span> if a cheap enough TSP tour exists; otherwise <span class="math-inline">NO</span>.</div>
+            </div>
+          </div>
+          <div class="proof-panel" id="proof-np">
+            <div class="proof-subhead">Step 1: TSP Decision is in NP</div>
+            <details class="proof-notation">
+              <summary>Notations used in this tab</summary>
+              <p><span class="math-inline">G=(V,E)</span>: the complete weighted TSP graph. <span class="math-inline">V</span> is the city set, <span class="math-inline">E</span> is the edge set, and <span class="math-inline">n=|V|</span> is the number of cities.</p>
+              <p><span class="math-inline">w</span>: the weight function used to look up edge costs. <span class="math-inline">B</span>: the decision bound. <span class="math-inline">C</span>: the certificate, meaning the proposed TSP tour we are verifying.</p>
+            </details>
+            <p><b>(a) Certificate format.</b> Formally, a certificate is a proposed TSP tour written as an ordered sequence <span class="math-inline">C = (c₁, c₂, ..., cₙ)</span>, where each <span class="math-inline">cᵢ ∈ V</span>. It claims the tour is <span class="math-inline">c₁ → c₂ → ... → cₙ → c₁</span>.</p>
+            <p>Example: if <span class="math-inline">V = {A, B, C, D}</span>, then <span class="math-inline">C = (A, C, D, B)</span> is a certificate claiming the TSP tour <span class="math-inline">A → C → D → B → A</span>. The return edge from the last city back to the first is implied.</p>
+            <p>The verifier checks <span class="math-inline">length(C) = n</span> first because a valid TSP tour must list every one of the <span class="math-inline">n</span> cities exactly once before returning to the start. If the list is too short, it skipped a city; if it is too long, it must repeat or include an invalid city.</p>
+            <p><b>(b) Verifier pseudocode.</b></p>
+            <code class="proof-code">VERIFY_TSP(G, w, B, certificate C)
+  n = |V(G)|
+  if length(C) != n: reject
+  if C does not contain every vertex exactly once: reject
+  total = 0
+  for i = 1 to n-1:
+      total = total + w(C[i], C[i+1])
+  total = total + w(C[n], C[1])
+  if total ≤ B: accept
+  else: reject</code>
+            <p><b>(c) Polynomial bound.</b> The verifier checks one proposed tour, not every possible tour.</p>
+            <div class="proof-grid2">
+              <div class="proof-card"><b>1. Length check</b><br>Check <span class="math-inline">length(C)=n</span>. This is <span class="math-inline">O(1)</span> if length is stored, and at worst <span class="math-inline">O(n)</span> if counted by scanning.</div>
+              <div class="proof-card"><b>2. Vertex uniqueness</b><br>Scan the <span class="math-inline">n</span> certificate entries and use a boolean table or set to reject repeats. This is <span class="math-inline">O(n)</span>.</div>
+              <div class="proof-card"><b>3. Tour cost</b><br>Add the <span class="math-inline">n</span> tour edges, including the return edge. With matrix/table lookup, this is <span class="math-inline">O(n)</span>.</div>
+              <div class="proof-card"><b>4. Bound test</b><br>Compare total cost with <span class="math-inline">B</span>. This is <span class="math-inline">O(1)</span>.</div>
+            </div>
+            <p>So the total verification time is <span class="math-inline">O(n)</span> using the usual adjacency-matrix/table representation, and therefore polynomial in the input size.</p>
+            <p><b>Intuition:</b> We may not know how to find the best tour quickly, but if someone hands us a proposed tour, checking it is easy. That is exactly what “in NP” means.</p>
+          </div>
+          <div class="proof-panel" id="proof-reduction">
+            <div class="proof-subhead">Step 2: Reduction mapping f</div>
+            <details class="proof-notation">
+              <summary>Notations used in this tab</summary>
+              <p><span class="math-inline">Q</span>: the source problem, Hamiltonian Cycle. <span class="math-inline">P</span>: the target problem, TSP Decision. <span class="math-inline">x=⟨G=(V,E)⟩</span>: one input instance of Hamiltonian Cycle.</p>
+              <p><span class="math-inline">f</span>: the reduction function. <span class="math-inline">f(x)=⟨G′,w,B⟩</span>: the TSP instance produced from <span class="math-inline">x</span>. <span class="math-inline">V′=V</span>, so the TSP graph uses the same vertices as the HC graph.</p>
+              <p><span class="math-inline">G′</span> is the complete graph on <span class="math-inline">V′</span>. It contains original edges from <span class="math-inline">E</span> with weight <span class="math-inline">1</span>, plus complement/missing edges not in <span class="math-inline">E</span> with weight <span class="math-inline">2</span>. <span class="math-inline">w</span> gives these edge weights, and <span class="math-inline">B</span> is the bound.</p>
+            </details>
+            <p><b>Source problem Q:</b> Hamiltonian Cycle. Input <span class="math-inline">x = ⟨G=(V,E)⟩</span>. Question: does <span class="math-inline">G</span> contain a simple cycle that visits every vertex exactly once?</p>
+            <p><b>Target problem P:</b> TSP Decision. We define a function <span class="math-inline">f : Σ* → Σ*</span> that converts an HC instance into a TSP instance.</p>
+            <code class="proof-code">f(⟨G=(V,E)⟩):
+  V′ = V
+  make G′ complete on V′
+  for every pair of distinct vertices u,v:
+      if (u,v) is an edge in G:
+          w(u,v) = 1
+      else:
+          w(u,v) = 2
+  B = |V|
+  output ⟨G′, w, B⟩</code>
+            <div class="proof-flow">
+              <div class="proof-card"><b>Hamiltonian Cycle input</b><br>A non-complete, unweighted graph <span class="math-inline">G</span>. We only know which edges exist.</div>
+              <div class="proof-arrow">→</div>
+              <div class="proof-card"><b>Mapping f</b><br>Keep the same vertices. Existing edges become cost <span class="math-inline">1</span>; missing edges become cost <span class="math-inline">2</span>. Set <span class="math-inline">B=n</span>.</div>
+              <div class="proof-arrow">→</div>
+              <div class="proof-card"><b>TSP Decision output</b><br>A complete weighted graph where tours using only original edges cost exactly <span class="math-inline">n</span>.</div>
+            </div>
+            <div class="proof-subhead">Concrete worked small instance</div>
+            <p>Take <span class="math-inline">V={A,B,C,D}</span> and original edges <span class="math-inline">{AB,BC,CD,DA,AC}</span>. The map creates the complete graph on the same four vertices. Edges <span class="math-inline">AB,BC,CD,DA,AC</span> get weight <span class="math-inline">1</span>. Missing edge <span class="math-inline">BD</span> gets weight <span class="math-inline">2</span>. Since <span class="math-inline">n=4</span>, set <span class="math-inline">B=4</span>. The cycle <span class="math-inline">A-B-C-D-A</span> uses four weight-1 edges, so the TSP instance is YES.</p>
+            <svg class="reductionSvg" viewBox="0 0 760 150" role="img" aria-label="Reduction transformer from Hamiltonian Cycle to TSP Decision">
+              <defs>
+                <marker id="arrowProof" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                  <path d="M 0 0 L 10 5 L 0 10 z" fill="#ffd166"></path>
+                </marker>
+              </defs>
+              <rect x="24" y="32" width="185" height="86" rx="10" fill="rgba(100,240,200,.08)" stroke="rgba(100,240,200,.45)"></rect>
+              <text x="116" y="62" fill="#e8ecff" font-size="14" text-anchor="middle" font-weight="850">Input x</text>
+              <text x="116" y="86" fill="#64f0c8" font-size="13" text-anchor="middle">HC graph G=(V,E)</text>
+              <text x="116" y="106" fill="#b7c0ff" font-size="11" text-anchor="middle">edges exist or do not exist</text>
+              <rect x="288" y="24" width="184" height="102" rx="12" fill="rgba(255,209,102,.08)" stroke="rgba(255,209,102,.55)"></rect>
+              <text x="380" y="52" fill="#ffd166" font-size="15" text-anchor="middle" font-weight="850">Reduction f</text>
+              <text x="380" y="77" fill="#e8ecff" font-size="12" text-anchor="middle">same vertices</text>
+              <text x="380" y="96" fill="#e8ecff" font-size="12" text-anchor="middle">edge: 1 · missing: 2</text>
+              <text x="380" y="115" fill="#e8ecff" font-size="12" text-anchor="middle">set B = n</text>
+              <rect x="551" y="32" width="185" height="86" rx="10" fill="rgba(106,169,255,.08)" stroke="rgba(106,169,255,.45)"></rect>
+              <text x="644" y="62" fill="#e8ecff" font-size="14" text-anchor="middle" font-weight="850">Output f(x)</text>
+              <text x="644" y="86" fill="#6aa9ff" font-size="13" text-anchor="middle">TSP ⟨G′,w,B⟩</text>
+              <text x="644" y="106" fill="#b7c0ff" font-size="11" text-anchor="middle">complete weighted graph</text>
+              <line x1="218" y1="75" x2="278" y2="75" stroke="#ffd166" stroke-width="3" marker-end="url(#arrowProof)"></line>
+              <line x1="482" y1="75" x2="542" y2="75" stroke="#ffd166" stroke-width="3" marker-end="url(#arrowProof)"></line>
+            </svg>
+            <div class="proof-subhead">Polynomial-time construction</div>
+            <div class="proof-grid2">
+              <div class="proof-card"><b>Work done by f</b><br>Check each pair of vertices and assign weight <span class="math-inline">1</span> if the edge existed in <span class="math-inline">G</span>, otherwise weight <span class="math-inline">2</span>.</div>
+              <div class="proof-card"><b>Time bound</b><br>There are <span class="math-inline">n(n-1)/2</span> unordered pairs in the undirected proof, so the construction takes <span class="math-inline">O(n²)</span> time and outputs <span class="math-inline">O(n²)</span> weighted edges.</div>
+            </div>
+            <p><b>Intuition:</b> Weight <span class="math-inline">1</span> means “this edge was legal in the original graph.” Weight <span class="math-inline">2</span> means “this edge was only added to make TSP complete.” The bound <span class="math-inline">B=n</span> forces any YES tour to avoid the added fake edges.</p>
+          </div>
+          <div class="proof-panel" id="proof-directions">
+            <div class="proof-subhead">Correctness of the reduction</div>
+            <details class="proof-notation">
+              <summary>Notations used in this tab</summary>
+              <p><span class="math-inline">G</span>: the original Hamiltonian Cycle graph. <span class="math-inline">f(G)</span>: the TSP Decision instance made from <span class="math-inline">G</span>. <span class="math-inline">G′</span>: the complete graph inside that TSP instance.</p>
+              <p><span class="math-inline">n=|V|</span>: the number of vertices/cities. Original edges get weight <span class="math-inline">1</span>, missing edges get weight <span class="math-inline">2</span>, and the reduction sets <span class="math-inline">B=n</span>.</p>
+            </details>
+            <p>We must prove the exact equivalence:</p>
+            <p><span class="math-inline">G ∈ HC ⇐⇒ f(G) ∈ TSP-DECISION</span></p>
+            <ol class="proof-step-list">
+              <li><b>Forward direction, HC YES ⇒ TSP YES:</b> Suppose <span class="math-inline">G</span> has a Hamiltonian cycle. A Hamiltonian cycle on <span class="math-inline">n</span> vertices uses exactly <span class="math-inline">n</span> edges. Every one of those edges is an original edge of <span class="math-inline">G</span>, so in <span class="math-inline">G′</span> every one has weight <span class="math-inline">1</span>. Total TSP tour cost is therefore <span class="math-inline">n</span>. Since <span class="math-inline">B=n</span>, the constructed TSP instance answers YES.</li>
+              <li><b>Backward direction, TSP YES ⇒ HC YES:</b> Suppose <span class="math-inline">f(G)</span> has a TSP tour of cost at most <span class="math-inline">B=n</span>. A tour visits every vertex and returns to the start, so it uses exactly <span class="math-inline">n</span> edges. Each edge has weight either <span class="math-inline">1</span> or <span class="math-inline">2</span>. If even one edge had weight <span class="math-inline">2</span>, the total would be more than <span class="math-inline">n</span>. So all chosen edges have weight <span class="math-inline">1</span>, meaning all chosen edges existed in the original graph <span class="math-inline">G</span>. Those edges form a Hamiltonian cycle in <span class="math-inline">G</span>.</li>
+              <li><b>Polynomial time bound of f:</b> The construction checks every unordered pair of vertices. There are <span class="math-inline">n(n-1)/2</span> pairs, so assigning all weights takes <span class="math-inline">O(n²)</span> time using an adjacency matrix or hash set for edge lookup. The output graph also has <span class="math-inline">O(n²)</span> edges, so this is polynomial in the input/output size.</li>
+              <li><b>Conclusion:</b> We have shown <span class="math-inline">HC ≤p TSP-DECISION</span>. Since Hamiltonian Cycle is NP-complete, this proves TSP Decision is NP-hard. Since TSP Decision is also in NP, TSP Decision is NP-complete.</li>
+            </ol>
+            <p><b>Oral Q&A shortcut:</b> “The whole trick is the bound <span class="math-inline">B=n</span>. A tour has <span class="math-inline">n</span> edges. If all are weight 1, cost is exactly <span class="math-inline">n</span>. One weight-2 edge already pushes the cost above <span class="math-inline">n</span>. So a cheap TSP tour is forced to be a Hamiltonian cycle in the original graph.”</p>
+          </div>
+          <div class="proof-panel" id="proof-edgecases">
+            <div class="proof-subhead">Edge Cases & Clarifications</div>
+            <details class="proof-notation">
+              <summary>Notations used in this tab</summary>
+              <p><span class="math-inline">G</span> is the Hamiltonian Cycle input graph. <span class="math-inline">G′</span> is the complete weighted TSP graph produced by the reduction. Existing edges get weight <span class="math-inline">1</span>, missing edges get weight <span class="math-inline">2</span>, and <span class="math-inline">B=n</span>.</p>
+            </details>
+            <div class="proof-grid2">
+              <div class="proof-card"><b>If G is already complete</b><br>The construction still works. Every pair is already an original edge, so every TSP edge gets weight <span class="math-inline">1</span>. A Hamiltonian cycle gives a tour of cost <span class="math-inline">n</span>.</div>
+              <div class="proof-card"><b>If G has missing edges</b><br>That is the normal case. We add the missing edges only because TSP expects a complete graph. Those added edges receive weight <span class="math-inline">2</span>, so they are too expensive for a tour with bound <span class="math-inline">B=n</span>.</div>
+              <div class="proof-card"><b>If a tour uses one weight-2 edge</b><br>A valid TSP tour has exactly <span class="math-inline">n</span> edges. If one edge has weight <span class="math-inline">2</span> and the rest are at least <span class="math-inline">1</span>, the total is greater than <span class="math-inline">n</span>. So it cannot be a YES tour under <span class="math-inline">B=n</span>.</div>
+              <div class="proof-card"><b>If a certificate repeats a vertex</b><br>The verifier rejects it. A valid TSP tour must visit every vertex exactly once before returning to the start.</div>
+              <div class="proof-card"><b>Very small graphs</b><br>The standard NP-completeness proof is for ordinary graph instances, usually <span class="math-inline">n ≥ 3</span>. Tiny cases can be answered directly and do not affect the polynomial-time reduction argument.</div>
+              <div class="proof-card"><b>Are weights 1 and 2 allowed?</b><br>Yes. They are positive integer weights, so the constructed instance is a valid TSP Decision instance.</div>
+            </div>
+            <p><b>Oral Q&A shortcut:</b> “The added weight-2 edges are not illegal; they are deliberately expensive. The bound <span class="math-inline">B=n</span> forces a YES tour to use only weight-1 edges, which means it was really a Hamiltonian cycle in the original graph.”</p>
+          </div>
+          <p>
+            So Hamiltonian Cycle ≤p TSP Decision. Since Hamiltonian Cycle is NP-complete and TSP Decision is in NP,
+            TSP Decision is NP-complete.
+          </p>
+          <p class="tiny">Use the main <b>Proof</b> mode below for the step-by-step HC → TSP Decision converter with graph highlighting.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <main class="wrap">
+    <section class="card">
+      <h2>Controls</h2>
+      <div class="controls">
+        <div class="segmented" aria-label="Algorithm mode">
+          <button class="modeBtn active" data-mode="bruteforce">Brute Force</button>
+          <button class="modeBtn" data-mode="nearest">Greedy</button>
+          <button class="modeBtn" data-mode="twoopt">Greedy + 2-Opt</button>
+          <button class="modeBtn" data-mode="compare">Compare</button>
+          <button class="modeBtn" data-mode="proof">Proof</button>
+        </div>
+
+        <div class="proofControlsMain">
+          <label for="proofPreset">Proof graph preset</label>
+          <select id="proofPreset" class="mb10">
+            <option value="hcYes4">HC YES: 4-Vertex Cycle</option>
+            <option value="hcNo4">HC NO: Broken 4-Vertex Graph</option>
+            <option value="hcYes5">HC YES: 5-Vertex Classroom Graph</option>
+          </select>
+          <p class="tiny mb10">Proof mode uses a non-complete, unweighted Hamiltonian Cycle graph as input, then constructs the complete weighted TSP Decision instance.</p>
+        </div>
+
+        <div class="row algorithmControls">
+          <div>
+            <label for="preset">Preset instance</label>
+            <select id="preset">
+              <option value="smallSquare">Small Square</option>
+              <option value="greedyTrap">Greedy Trap</option>
+              <option value="random6">Random 6 Cities</option>
+              <option value="tieCase">Tie Case</option>
+              <option value="limitDemo">Brute Force Limit Demo</option>
+            </select>
+          </div>
+          <div>
+            <label for="bound">Decision bound B</label>
+            <input id="bound" type="number" min="1" step="1" value="1000" />
+          </div>
+        </div>
+
+        <div class="algorithmControls">
+        <label for="cityInput">Custom city input: one city per line as <span class="math-inline">Name,x,y</span></label>
+        <textarea id="cityInput" spellcheck="false">A,120,120
+B,360,120
+C,360,360
+D,120,360</textarea>
+        <div class="row mt10">
+          <button id="applyCities" class="secondary iconBtn"><span class="ico">↻</span> Load Cities</button>
+          <button id="useWeights" class="secondary iconBtn"><span class="ico">⌁</span> Build Weights</button>
+        </div>
+        <div class="validationBox ok" id="validationBox">Input checks ready: valid city count, unique names, positive bound, and duplicate-coordinate warnings.</div>
+        <p class="tiny mb10">Coordinates become a complete weighted graph using rounded Euclidean distance. The current tour cost includes the return edge back to the start.</p>
+
+        <div class="row">
+          <div>
+            <label for="startCity">Start city</label>
+            <select id="startCity"></select>
+          </div>
+          <div>
+            <label for="tieMode">Tie handling</label>
+            <select id="tieMode">
+              <option value="lex">Alphabetical</option>
+              <option value="first">Input order</option>
+              <option value="explain">Pause and explain</option>
+            </select>
+          </div>
+        </div>
+        </div>
+
+        <label for="speed">Speed slider</label>
+        <input id="speed" type="range" min="1" max="10" value="5" />
+        <div class="speed-display" id="speedLabel">Speed: 5</div>
+
+        <div class="btnRow">
+          <button id="build" class="iconBtn"><span class="ico">▣</span> Build Steps</button>
+          <button id="step" class="secondary iconBtn"><span class="ico">▶|</span> Step</button>
+          <button id="play" class="iconBtn"><span class="ico">▶</span> Play</button>
+          <button id="pause" class="secondary iconBtn"><span class="ico">Ⅱ</span> Pause</button>
+          <button id="reset" class="danger iconBtn"><span class="ico">↺</span> Reset</button>
+        </div>
+
+        <div class="stat">
+          <div class="pill"><span>Status</span><b><span class="statusDot" id="statusDot"></span><span id="status">Idle</span></b></div>
+          <div class="pill"><span>Step</span><b id="stepCount">0 / 0</b></div>
+          <div class="pill"><span>Cities</span><b id="cityCount">5</b></div>
+          <div class="pill"><span>Tours</span><b id="tourCount">24</b></div>
+          <div class="pill"><span>Checked</span><b id="checkedCount">0</b></div>
+          <div class="pill"><span>Comparisons</span><b id="comparisonCount">0</b></div>
+          <div class="pill"><span>Swaps tested</span><b id="swapCount">0</b></div>
+          <div class="pill"><span>Accepted</span><b id="improvementCount">0</b></div>
+          <div class="pill"><span>Elapsed</span><b id="elapsedTime">0 ms</b></div>
+          <div class="pill"><span>Bound B</span><b id="boundStat">1000</b></div>
+          <div class="pill"><span>Current cost</span><b id="currentCost">pending</b></div>
+          <div class="pill"><span>Cost before</span><b id="costBefore">--</b></div>
+          <div class="pill"><span>Cost after</span><b id="costAfter">--</b></div>
+          <div class="pill"><span>Improvement</span><b id="improvementPct">0%</b></div>
+          <div class="pill"><span>Best exact</span><b id="bestExact">pending</b></div>
+          <div class="pill"><span>Decision</span><b id="decision">unknown</b></div>
+          <div class="pill wide"><span>Current tour</span><b id="currentTour">A → B → C → D → A</b></div>
+          <div class="pill wide"><span>Unvisited</span><b id="unvisitedList">B, C, D</b></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Visualization</h2>
+      <div class="viz">
+        <div class="vizTop">
+          <div>
+            <div class="modeTitle" id="modeTitle">Brute Force Exact Solver</div>
+            <div class="phaseNote" id="phaseNote">City data, Euclidean weights, tour cost, and SVG edge states are active. Click Build Steps to preview the teaching trace.</div>
+          </div>
+          <div class="legend">
+            <span><i class="dot" style="background:var(--city)"></i>City</span>
+            <span><i class="dot" style="background:var(--exact)"></i>Exact tour</span>
+            <span><i class="dot" style="background:var(--greedy)"></i>Nearest Neighbor</span>
+            <span><i class="dot" style="background:var(--opt)"></i>Greedy + 2-Opt</span>
+            <span><i class="dot" style="background:var(--city)"></i>Candidate</span>
+            <span><i class="dot" style="background:var(--exact)"></i>Current</span>
+            <span><i class="dot" style="background:var(--greedy)"></i>Accepted</span>
+            <span><i class="dot" style="background:var(--bad)"></i>Rejected</span>
+          </div>
+        </div>
+
+        <div class="svgFrame">
+          <svg class="graphSvg" id="graphSvg" viewBox="0 0 640 470" role="img" aria-label="TSP city graph visualization"></svg>
+        </div>
+
+        <div class="proof-converter" id="mainProofPanel" style="display:none">
+          <h3>Proof Mode: Hamiltonian Cycle → TSP Decision</h3>
+          <div class="proof-controls">
+            <button id="vizProofPrev" class="secondary">Previous</button>
+            <button id="vizProofNext">Next Proof Step</button>
+            <div class="proof-progress" id="mainProofProgress">Step 1 / 7</div>
+          </div>
+          <div class="proof-explain" id="mainProofExplain"></div>
+        </div>
+
+        <div class="comparisonGrid" id="comparisonGrid">
+          <div class="compareCard">
+            <h3 style="color:var(--exact)">Brute Force Exact</h3>
+            <div class="compareValue" id="exactCost">--</div>
+            <div class="compareMeta" id="exactMeta">Enumerates all tours. This is the decision authority for small n.</div>
+          </div>
+          <div class="compareCard">
+            <h3 style="color:var(--greedy)">Nearest Neighbor</h3>
+            <div class="compareValue" id="greedyCost">--</div>
+            <div class="compareMeta" id="greedyMeta">Chooses the closest unvisited city each time. Fast, but not guaranteed optimal.</div>
+          </div>
+          <div class="compareCard">
+            <h3 style="color:var(--opt)">Greedy + 2-Opt Improvement</h3>
+            <div class="compareValue" id="optCost">--</div>
+            <div class="compareMeta" id="optMeta">Swaps crossing edges when a shorter tour is found. Local search, not proof.</div>
+          </div>
+        </div>
+        <div class="approxPanel" id="approxPanel">
+          <h3>Approximation Analysis</h3>
+          <div id="approxContent"></div>
+        </div>
+        <div class="compareConceptPanel" id="compareConceptPanel">
+          <h3>When the Optimum Is Unknown</h3>
+          <div id="compareConceptContent"></div>
+        </div>
+
+        <div class="panelGrid">
+          <div>
+            <h2 style="border-radius:16px 16px 0 0">Pseudocode</h2>
+            <div class="mono" id="pseudocode"></div>
+          </div>
+          <div>
+            <h2 style="border-radius:16px 16px 0 0">Distance Matrix</h2>
+            <div class="matrixWrap" id="matrixWrap"></div>
+          </div>
+          <div class="spanFull">
+            <div class="explain" id="explain"><b>Step Explanation:</b> Choose a mode and click <b>Build Steps</b>. Each step will highlight the relevant pseudocode line and explain the teaching point.</div>
+          </div>
+          <div class="spanFull">
+            <div class="algorithmAnalysis" id="algorithmAnalysis"></div>
+          </div>
+        </div>
+
+        <div>
+          <h2 style="border-radius:16px 16px 0 0">Growth Curve Chart</h2>
+          <div class="svgFrame">
+            <svg class="growthSvg" id="growthSvg" viewBox="0 0 780 260" role="img" aria-label="Growth chart comparing polynomial, n squared, and factorial work"></svg>
+          </div>
+          <div class="tiny mt10" id="growthExplain">Factorial brute force grows by multiplying by the next city count each time n increases. Polynomial heuristics grow much more slowly, which is why they remain usable when exact search stops being practical.</div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <p class="footerNote">
+    GitHub Pages ready: this page uses only inline HTML, CSS, Vanilla JavaScript, and SVG. Brute-force pseudocode follows the standard exhaustive-search presentation of TSP discussed in CLRS. The TSP data model, proof converter, exact solver, heuristics, and comparison views are implemented.
+  </p>
+
+  <script>
+    const $ = id => document.getElementById(id);
+
+    const makeCities = rows => rows.map((row,id) => ({id, name:row[0], x:row[1], y:row[2]}));
+
+    const PRESETS = {
+      smallSquare: {
+        bound: 1000,
+        cities: makeCities([
+          ['A',120,120],['B',360,120],['C',360,360],['D',120,360]
+        ])
+      },
+      greedyTrap: {
+        bound: 1120,
+        cities: makeCities([
+          ['A',533,191],['B',152,328],['C',92,257],['D',502,337],['E',372,359],['F',466,114]
+        ])
+      },
+      random6: {
+        bound: 810,
+        cities: makeCities([
+          ['A',159,190],['B',470,252],['C',132,127],['D',274,129],['E',263,256],['F',389,215]
+        ])
+      },
+      tieCase: {
+        bound: 700,
+        cities: makeCities([
+          ['A',260,220],['B',160,220],['C',360,220],['D',260,120],['E',260,320]
+        ])
+      },
+      limitDemo: {
+        bound: 1600,
+        cities: makeCities([
+          ['A',80,90],['B',175,130],['C',280,75],['D',395,120],['E',520,95],
+          ['F',550,260],['G',430,350],['H',300,310],['I',170,360],['J',70,245]
+        ])
+      }
+    };
+
+    const PSEUDOCODE = {
+      bruteforce: [
+        'BRUTE_FORCE_TSP_DECISION(G, B)',
+        '  choose a start city s',
+        '  for each permutation P of V - {s}',
+        '      T = [s] + P + [s]',
+        '      cost = total weight of T',
+        '      if cost ≤ B: return YES',
+        '  return NO'
+      ],
+      nearest: [
+        'NEAREST_NEIGHBOR_TOUR(G, start)',
+        '  current = start; tour = [start]',
+        '  unvisited = all cities except start',
+        '  while unvisited is not empty',
+        '      compare current to each unvisited city',
+        '      nearest = city with minimum distance',
+        '      append nearest to tour; remove it from unvisited',
+        '      current = nearest',
+        '  append start to close the tour'
+      ],
+      twoopt: [
+        'TWO_OPT_FROM_NEAREST_NEIGHBOR(G, start)',
+        '  tour = nearest_neighbor_tour(G, start)',
+        '  improved = true; iteration = 0',
+        '  while improved and iteration < maxIterations',
+        '      improved = false',
+        '      for each non-adjacent edge pair (a,b), (c,d)',
+        '          delta = (dist(a,c)+dist(b,d)) - (dist(a,b)+dist(c,d))',
+        '          if delta < 0: reverse segment b..c',
+        '              improved = true; restart scan',
+        '  return local optimum tour'
+      ],
+      compare: [
+        'COMPARE_STRATEGIES(G, B)',
+        '  build exact brute-force trace',
+        '  build nearest-neighbor trace',
+        '  build 2-opt trace from greedy tour',
+        '  display costs side by side',
+        '  exact solver decides YES/NO',
+        '  heuristics explain speed vs certainty'
+      ],
+      proof: [
+        'REDUCE_HC_TO_TSP_DECISION(G)',
+        '  input: unweighted graph G = (V,E)',
+        '  create complete graph G′ on V',
+        '  if edge is in E: assign weight 1',
+        '  otherwise: assign weight 2',
+        '  set B = |V|',
+        '  HC has cycle iff TSP has tour cost ≤ B'
+      ]
+    };
+
+    let state = {
+      mode:'bruteforce',
+      cities: PRESETS.smallSquare.cities.map(c => ({...c})),
+      weights: [],
+      steps: [],
+      stepIndex: 0,
+      playing: false,
+      playToken: 0,
+      activeCityId: null,
+      activeTour: [],
+      exactTour: [],
+      greedyTour: [],
+      optTour: [],
+      edgeStates: [],
+      matrixHighlights: [],
+      currentCost: null,
+      exactBestCost: Infinity,
+      permutationsChecked: 0,
+      comparisonsCount: 0,
+      swapsTested: 0,
+      improvementsAccepted: 0,
+      costBefore: null,
+      costAfter: null,
+      initialTwoOptCost: null,
+      operationsCount: 0,
+      elapsedMs: 0,
+      buildStartedAt: 0,
+      unvisitedIds: []
+    };
+
+    function distance(a,b){
+      return Math.round(Math.hypot(a.x-b.x,a.y-b.y));
+    }
+
+    function buildWeights(){
+      state.weights = state.cities.map((a,i) => state.cities.map((b,j) => i===j ? 0 : distance(a,b)));
+    }
+
+    function factorial(n){
+      let out = 1;
+      for(let i=2;i<=n;i++) out *= i;
+      return out;
+    }
+
+    function tourCost(tour, closeTour=true){
+      if(!tour || tour.length < 2) return 0;
+      let total = 0;
+      for(let i=0;i<tour.length-1;i++) total += edgeWeight(tour[i], tour[i+1]);
+      if(closeTour && tour[0] !== tour[tour.length-1]) total += edgeWeight(tour[tour.length-1], tour[0]);
+      return total;
+    }
+
+    function edgeWeight(aId,bId){
+      return state.weights[aId]?.[bId] ?? 0;
+    }
+
+    function cityName(id){
+      return state.cities.find(c=>c.id === id)?.name ?? `C${id}`;
+    }
+
+    function tourNames(tour, closeTour=true){
+      if(!tour || !tour.length) return '';
+      const ids = closeTour && tour[0] !== tour[tour.length-1] ? tour.concat(tour[0]) : tour;
+      return ids.map(cityName).join(' → ');
+    }
+
+    function simpleTour(){
+      return state.cities.map(c=>c.id);
+    }
+
+    function nearestPlaceholderTour(){
+      const ids = state.cities.map(c=>c.id);
+      if(ids.length < 3) return simpleTour();
+      const startId = Number($('startCity').value);
+      return nearestNeighborTour(startId).tour;
+    }
+
+    function optPlaceholderTour(){
+      const ids = state.cities.map(c=>c.id);
+      if(ids.length < 4) return simpleTour();
+      const startId = Number($('startCity').value);
+      const rest = ids.filter(id=>id !== startId);
+      return [startId, ...rest.slice(1), rest[0]];
+    }
+
+    function nearestNeighborTour(startId){
+      const ids = state.cities.map(c=>c.id);
+      const tour = [startId];
+      let current = startId;
+      let unvisited = ids.filter(id=>id !== startId);
+      let comparisons = 0;
+      const tieMode = $('tieMode')?.value || 'lex';
+      while(unvisited.length){
+        let nearest = null;
+        unvisited.forEach(candidate=>{
+          comparisons++;
+          if(chooseTie(nearest, candidate, current, tieMode)){
+            nearest = candidate;
+          }
+        });
+        tour.push(nearest);
+        current = nearest;
+        unvisited = unvisited.filter(id=>id !== nearest);
+      }
+      tour.push(startId);
+      return {tour, cost:tourCost(tour, false), comparisons};
+    }
+
+    function bruteForceSummary(startId){
+      if(state.cities.length > 9){
+        return {skipped:true, reason:`Skipped: ${factorial(state.cities.length - 1).toLocaleString()} tours after fixing the start city.`};
+      }
+      const ids = state.cities.map(c=>c.id);
+      const remaining = ids.filter(id=>id !== startId);
+      const started = performance.now();
+      let bestCost = Infinity;
+      let bestTour = [];
+      let operations = 0;
+      let checked = 0;
+      function visit(prefix, rest){
+        if(!rest.length){
+          const tour = [startId, ...prefix, startId];
+          const cost = tourCost(tour, false);
+          checked++;
+          operations += tour.length - 1;
+          if(cost < bestCost){
+            bestCost = cost;
+            bestTour = tour;
+          }
+          return;
+        }
+        for(let i=0;i<rest.length;i++) visit(prefix.concat(rest[i]), rest.slice(0,i).concat(rest.slice(i+1)));
+      }
+      visit([], remaining);
+      return {skipped:false, tour:bestTour, cost:bestCost, operations, checked, runtime:performance.now() - started};
+    }
+
+    function twoOptSummaryFromTour(seedTour, maxIterations=Math.max(1, state.cities.length * state.cities.length)){
+      const started = performance.now();
+      let tour = seedTour.slice();
+      let cost = tourCost(tour, false);
+      const initialCost = cost;
+      let swaps = 0;
+      let improvements = 0;
+      let improved = true;
+      let iteration = 0;
+      while(improved && iteration < maxIterations){
+        improved = false;
+        iteration++;
+        let acceptedThisPass = false;
+        for(let i=0;i<tour.length-3 && !acceptedThisPass;i++){
+          for(let k=i+2;k<tour.length-1 && !acceptedThisPass;k++){
+            if(i === 0 && k === tour.length-2) continue;
+            const a=tour[i], b=tour[i+1], c=tour[k], d=tour[k+1];
+            const delta = (edgeWeight(a,c) + edgeWeight(b,d)) - (edgeWeight(a,b) + edgeWeight(c,d));
+            swaps++;
+            if(delta < 0){
+              tour = twoOptSwap(tour, i+1, k);
+              cost += delta;
+              improvements++;
+              improved = true;
+              acceptedThisPass = true;
+            }
+          }
+        }
+      }
+      return {tour, cost, operations:swaps, swaps, improvements, initialCost, runtime:performance.now() - started};
+    }
+
+    function parseCities(text){
+      const rows = text.split(/\n+/).map(s=>s.trim()).filter(Boolean);
+      const parsed = rows.map((row,idx) => {
+        const parts = row.split(',').map(s=>s.trim());
+        if(parts.length !== 3) throw new Error(`Line ${idx+1} should be Name,x,y`);
+        const x = Number(parts[1]), y = Number(parts[2]);
+        if(!Number.isFinite(x) || !Number.isFinite(y)) throw new Error(`Line ${idx+1} has invalid coordinates`);
+        return {id:idx, name:parts[0] || `C${idx+1}`, x, y};
+      });
+      if(parsed.length < 3) throw new Error('Use at least 3 cities for a TSP tour.');
+      const names = new Set();
+      parsed.forEach((city,idx)=>{
+        if(names.has(city.name)) throw new Error(`Duplicate city name "${city.name}" on line ${idx+1}`);
+        names.add(city.name);
+      });
+      return parsed;
+    }
+
+    function validateCurrentInput(){
+      const issues = [];
+      const warnings = [];
+      const B = Number($('bound').value);
+      if(!Number.isFinite(B) || B <= 0) issues.push('Bound B must be a positive number.');
+      if(state.cities.length < 3) issues.push('Use at least 3 cities for a TSP tour.');
+      const names = new Set();
+      const coords = new Map();
+      state.cities.forEach(city=>{
+        if(names.has(city.name)) issues.push(`Duplicate city name "${city.name}".`);
+        names.add(city.name);
+        const key = `${city.x},${city.y}`;
+        if(coords.has(key)) warnings.push(`${city.name} shares coordinates with ${coords.get(key)}; zero-distance edges are allowed but may make ties.`);
+        else coords.set(key, city.name);
+      });
+      if(state.mode === 'bruteforce' && state.cities.length > 9){
+        warnings.push(`Exact brute force is capped at n <= 9. This instance has ${state.cities.length} cities and ${(factorial(state.cities.length-1)).toLocaleString()} possible tours.`);
+      }
+      renderValidation(issues, warnings);
+      return {ok:issues.length === 0, issues, warnings};
+    }
+
+    function renderValidation(issues=[], warnings=[]){
+      const box = $('validationBox');
+      if(!box) return;
+      if(issues.length){
+        box.className = 'validationBox error';
+        box.innerHTML = `<b>Input issue:</b> ${issues.join(' ')}`;
+      }else if(warnings.length){
+        box.className = 'validationBox';
+        box.innerHTML = `<b>Edge-case warning:</b> ${warnings.join(' ')}`;
+      }else{
+        box.className = 'validationBox ok';
+        box.innerHTML = '<b>Input checks passed:</b> city count, unique names, positive bound, and coordinate data look valid.';
+      }
+    }
+
+    function chooseTie(currentBest, candidate, current, mode){
+      if(currentBest === null) return true;
+      const d = edgeWeight(current, candidate);
+      const bestD = edgeWeight(current, currentBest);
+      if(d < bestD) return true;
+      if(d > bestD) return false;
+      if(mode === 'first' || mode === 'explain') return false;
+      return cityName(candidate).localeCompare(cityName(currentBest)) < 0;
+    }
+
+    function renderPseudocode(){
+      const pseudo = PSEUDOCODE[state.mode];
+      $('pseudocode').innerHTML = '';
+      pseudo.forEach((line,idx)=>{
+        const div = document.createElement('div');
+        div.className = 'codeLine';
+        div.dataset.line = idx;
+        div.textContent = line;
+        $('pseudocode').appendChild(div);
+      });
+      renderAlgorithmAnalysis();
+    }
+
+    function renderAlgorithmAnalysis(){
+      const n = state.cities.length;
+      const exactTours = n > 1 ? factorial(n - 1).toLocaleString() : '0';
+      const nnWork = (n * n).toLocaleString();
+      const twoOptWork = (5 * n * n).toLocaleString();
+      const content = {
+        bruteforce: {
+          title:'Exact brute-force baseline and computation growth',
+          paradigm:'Exhaustive search. It fixes a start city, enumerates every ordering of the remaining cities, and checks the bound B.',
+          design:'This is the correct exact baseline because it cannot miss the optimal tour. It is included to prove the answer on small inputs and to show why exact TSP becomes impractical.',
+          quality:'Best possible tour for this input. The pseudocode follows the standard textbook exhaustive-search idea from CLRS: enumerate tours, compute cost, and test the decision bound B.',
+          computation:`Time complexity: O(n · (n - 1)!) = O(n!). After fixing the start city, this preset has ${exactTours} candidate tours; each tour cost uses n edge additions.`,
+          growth:'Great for small n and classroom verification. Not practical as n grows, which is why the tool caps exact search at n <= 9.'
+        },
+        nearest: {
+          title:'Nearest-neighbor greedy design and behavior',
+          paradigm:'Greedy algorithm. At each step it makes the locally cheapest choice: go to the closest unvisited city.',
+          design:'This design is fast and easy to explain, but it can be trapped by early local choices. The Greedy Trap preset is the concrete counterexample for Q&A.',
+          quality:'Builds one fast tour by always taking the closest unvisited city. The Greedy Trap preset shows the weakness: A-F-D-E-B-C-A costs 1221, while the exact best A-D-E-B-C-F-A costs 1098.',
+          computation:`Time complexity: O(n²). This preset needs about ${nnWork} distance checks in the usual n² view, far smaller than ${exactTours} exact tours for the same n.`,
+          growth:'Scales well as cities grow, but it is a heuristic: cost > B does not prove NO, and cost may be above the optimum.'
+        },
+        twoopt: {
+          title:'Greedy construction followed by 2-Opt local search',
+          paradigm:'Greedy construction plus local search. Nearest Neighbor builds an initial tour, then 2-Opt repeatedly searches nearby tours for an improving edge swap.',
+          design:'2-Opt is justified because many bad tours contain crossing or inefficient edge pairs. Swapping two non-adjacent edges can shorten the route without enumerating all tours.',
+          quality:'Starts from the greedy tour. It removes two non-adjacent edges, reconnects them the other way, and reverses the middle segment if that makes the tour shorter.',
+          computation:`Typical classroom bound: O(k · n²), where k is the number of improvement passes. Each swap test is O(1), and the chart uses about ${twoOptWork} units for this n.`,
+          growth:'2-Opt repeats these swaps until no improving pair is found. That is useful local improvement, but it is still not a proof of the global optimum.'
+        },
+        compare: {
+          title:'Side-by-side quality and computation comparison',
+          paradigm:'Comparative algorithm analysis. The same input is solved by exact search and by practical heuristics so quality and computation can be compared directly.',
+          design:'The exact result is the benchmark when small enough. Greedy and 2-Opt show the practical trade-off: much faster computation, but no guarantee of global optimality.',
+          quality:'This tab is the main quality comparison: exact gives the benchmark when available, greedy gives the quick baseline, and 2-Opt shows local improvement.',
+          computation:'Exact brute force is O(n!), Nearest Neighbor is O(n²), and 2-Opt is shown as O(k · n²). The cards compare operation counts and runtime on the current instance.',
+          growth:'Use this with the growth chart below: factorial exact search separates quickly from n²-style heuristic work as the city count increases.'
+        },
+        proof: {
+          title:'NP-completeness proof by polynomial-time reduction',
+          paradigm:'Polynomial-time many-one reduction. The tool reduces undirected Hamiltonian Cycle to TSP Decision using the weight-1/weight-2 construction.',
+          design:'The construction is chosen so original graph edges are cheap and missing edges are expensive. Since a tour has n edges and B=n, a YES tour must use only original edges.',
+          quality:'This tab is about NP-completeness, not route quality. It shows how a Hamiltonian Cycle instance is converted into a TSP Decision instance.',
+          computation:'Reduction time complexity: O(n²). It checks n(n - 1)/2 unordered vertex pairs and assigns weight 1 or 2.',
+          growth:'This supports the theory side: the construction is efficient, so hardness transfers from Hamiltonian Cycle to TSP Decision.'
+        }
+      }[state.mode];
+
+      $('algorithmAnalysis').innerHTML = `
+        <div class="analysisGrid">
+          <div class="analysisItem purple"><b>Paradigm</b>${content.paradigm}</div>
+          <div class="analysisItem purple"><b>Design justification</b>${content.design}</div>
+          <div class="analysisItem blue"><b>Tour quality</b>${content.quality}</div>
+          <div class="analysisItem green"><b>Computation</b>${content.computation}</div>
+          <div class="analysisItem gold"><b>As cities grow</b>${content.growth}</div>
+        </div>
+      `;
+    }
+
+    function highlightLine(line){
+      document.querySelectorAll('.codeLine').forEach(el=>el.classList.remove('active'));
+      const el = document.querySelector(`.codeLine[data-line="${line}"]`);
+      if(el) el.classList.add('active');
+    }
+
+    function renderStartCities(){
+      $('startCity').innerHTML = state.cities.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+    }
+
+    function renderMatrix(){
+      let html = '<table><thead><tr><th></th>' + state.cities.map(c=>`<th>${c.name}</th>`).join('') + '</tr></thead><tbody>';
+      state.cities.forEach((c,i)=>{
+        html += `<tr><th>${c.name}</th>` + state.weights[i].map((v,j)=>`<td class="matrixCell" data-from="${i}" data-to="${j}">${v}</td>`).join('') + '</tr>';
+      });
+      html += '</tbody></table>';
+      $('matrixWrap').innerHTML = html;
+      renderMatrixHighlights();
+    }
+
+    function matrixHighlightClass(stateName){
+      return {
+        candidate:'highlight-candidate',
+        current:'highlight-current',
+        accepted:'highlight-accepted',
+        rejected:'highlight-rejected'
+      }[stateName] || 'highlight-candidate';
+    }
+
+    function renderMatrixHighlights(){
+      document.querySelectorAll('.matrixCell').forEach(cell=>{
+        cell.classList.remove('highlight-candidate','highlight-current','highlight-accepted','highlight-rejected');
+      });
+      const priority = {rejected:1,candidate:2,accepted:3,current:4};
+      const cells = new Map();
+      (state.matrixHighlights || []).forEach(edge=>{
+        if(!Number.isInteger(edge.from) || !Number.isInteger(edge.to)) return;
+        [[edge.from, edge.to], [edge.to, edge.from]].forEach(([from,to])=>{
+          const key = `${from}-${to}`;
+          const existing = cells.get(key);
+          if(!existing || (priority[edge.state] || 0) >= (priority[existing.state] || 0)){
+            cells.set(key, edge);
+          }
+        });
+      });
+      cells.forEach((edge,key)=>{
+        const [from,to] = key.split('-');
+        const cell = document.querySelector(`.matrixCell[data-from="${from}"][data-to="${to}"]`);
+        if(cell) cell.classList.add(matrixHighlightClass(edge.state));
+      });
+    }
+
+    function renderGraph(){
+      if(state.mode === 'proof'){
+        renderMainProofMode();
+        return;
+      }
+      const svg = $('graphSvg');
+      const cities = state.cities;
+      const pad = 64;
+      const minX = Math.min(...cities.map(c=>c.x));
+      const maxX = Math.max(...cities.map(c=>c.x));
+      const minY = Math.min(...cities.map(c=>c.y));
+      const maxY = Math.max(...cities.map(c=>c.y));
+      const spanX = Math.max(1, maxX - minX);
+      const spanY = Math.max(1, maxY - minY);
+      const scale = Math.min((640 - pad * 2) / spanX, (470 - pad * 2) / spanY, 1.65);
+      const offsetX = (640 - spanX * scale) / 2 - minX * scale;
+      const offsetY = (470 - spanY * scale) / 2 - minY * scale;
+      const plotCities = cities.map(c=>({...c, x:c.x * scale + offsetX, y:c.y * scale + offsetY}));
+      const byId = Object.fromEntries(plotCities.map(c=>[c.id,c]));
+      const focusedStep = (state.edgeStates || []).length > 0;
+      let h = '<rect x="0" y="0" width="640" height="470" fill="rgba(0,0,0,0.01)"/>';
+      h += renderMapBackdrop();
+      for(let i=0;i<plotCities.length;i++){
+        for(let j=i+1;j<plotCities.length;j++){
+          const a=plotCities[i], b=plotCities[j];
+          h += `<line class="edgeLine" x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}"/>`;
+          if(!focusedStep && plotCities.length <= 6){
+            const mx=(a.x+b.x)/2, my=(a.y+b.y)/2;
+            h += `<text class="weightLabel" x="${mx}" y="${my-4}">${state.weights[i][j]}</text>`;
+          }
+        }
+      }
+      h += tourLines(state.exactTour, byId, 'exact');
+      h += tourLines(state.greedyTour, byId, 'greedy');
+      h += tourLines(state.optTour, byId, 'opt');
+      h += edgeStateLines(byId);
+      plotCities.forEach((c)=>{
+        const active = c.id === state.activeCityId ? ' active' : '';
+        h += `<circle class="cityNode${active}" cx="${c.x}" cy="${c.y}" r="22"/>`;
+        h += `<text class="cityLabel" x="${c.x}" y="${c.y}">${c.name}</text>`;
+      });
+      svg.innerHTML = h;
+    }
+
+    function renderMapBackdrop(){
+      return `
+        <g opacity="0.50" pointer-events="none">
+          <path d="M-20 72 C82 38 122 65 202 43 C296 18 348 75 432 48 C516 22 584 32 668 77 L660 456 C556 430 494 458 412 432 C314 402 260 448 170 424 C92 403 46 426 -24 392 Z" fill="rgba(100,240,200,0.065)"/>
+          <path d="M52 52 C95 28 132 42 162 70 C134 94 90 91 54 76 Z" fill="rgba(134,218,104,0.16)"/>
+          <path d="M456 54 C505 24 570 36 604 78 C556 103 498 96 458 74 Z" fill="rgba(134,218,104,0.14)"/>
+          <path d="M44 324 C92 294 146 306 174 344 C125 372 76 362 44 344 Z" fill="rgba(134,218,104,0.13)"/>
+          <path d="M458 330 C512 295 590 320 622 367 C570 390 504 378 462 354 Z" fill="rgba(134,218,104,0.13)"/>
+          <path d="M392 -20 C374 70 428 116 390 185 C354 250 416 295 388 366 C370 412 388 444 425 498" fill="none" stroke="rgba(100,205,240,0.23)" stroke-width="28" stroke-linecap="round"/>
+          <path d="M392 -20 C374 70 428 116 390 185 C354 250 416 295 388 366 C370 412 388 444 425 498" fill="none" stroke="rgba(32,38,58,0.28)" stroke-width="8" stroke-linecap="round" stroke-dasharray="8 16"/>
+          <path d="M45 100 C150 128 225 96 313 126 C418 162 492 133 604 157" fill="none" stroke="rgba(232,236,255,0.18)" stroke-width="5" stroke-linecap="round"/>
+          <path d="M34 224 C110 198 174 238 248 214 C345 182 424 226 592 206" fill="none" stroke="rgba(232,236,255,0.18)" stroke-width="5" stroke-linecap="round"/>
+          <path d="M55 340 C142 312 216 350 308 326 C422 295 502 326 616 292" fill="none" stroke="rgba(232,236,255,0.17)" stroke-width="5" stroke-linecap="round"/>
+          <path d="M116 35 C98 130 144 204 118 292 C102 347 120 392 150 468" fill="none" stroke="rgba(232,236,255,0.14)" stroke-width="4" stroke-linecap="round"/>
+          <path d="M247 18 C236 102 266 170 246 252 C225 337 260 390 286 462" fill="none" stroke="rgba(232,236,255,0.14)" stroke-width="4" stroke-linecap="round"/>
+          <path d="M527 30 C500 126 534 186 514 272 C498 342 518 402 552 468" fill="none" stroke="rgba(232,236,255,0.14)" stroke-width="4" stroke-linecap="round"/>
+          <path d="M28 164 C78 146 118 174 178 154 C238 133 294 154 336 174" fill="none" stroke="rgba(232,236,255,0.11)" stroke-width="3" stroke-linecap="round"/>
+          <path d="M306 276 C380 255 448 282 516 254 C564 235 604 236 650 248" fill="none" stroke="rgba(232,236,255,0.11)" stroke-width="3" stroke-linecap="round"/>
+          <circle cx="86" cy="385" r="22" fill="rgba(106,169,255,0.075)" stroke="rgba(106,169,255,0.13)" stroke-width="3"/>
+          <circle cx="552" cy="102" r="17" fill="rgba(255,209,102,0.075)" stroke="rgba(255,209,102,0.14)" stroke-width="3"/>
+          <rect x="72" y="130" width="28" height="35" rx="4" fill="rgba(255,209,102,0.075)" stroke="rgba(255,209,102,0.14)"/>
+          <rect x="478" y="332" width="36" height="48" rx="5" fill="rgba(255,209,102,0.075)" stroke="rgba(255,209,102,0.14)"/>
+          <rect x="300" y="82" width="38" height="42" rx="5" fill="rgba(199,125,255,0.06)" stroke="rgba(199,125,255,0.13)"/>
+          ${treeIcon(84,72,0.75)}${treeIcon(138,72,0.58)}${treeIcon(544,74,0.65)}${treeIcon(584,360,0.72)}
+          ${treeIcon(98,350,0.60)}${treeIcon(158,342,0.52)}${treeIcon(500,354,0.55)}${treeIcon(52,392,0.65)}
+          <path d="M30 62 L70 58 M36 78 L87 75 M42 94 L94 88" stroke="rgba(232,236,255,0.10)" stroke-width="3" stroke-linecap="round"/>
+          <path d="M558 376 L612 364 M570 394 L628 382 M548 412 L596 402" stroke="rgba(232,236,255,0.10)" stroke-width="3" stroke-linecap="round"/>
+        </g>
+      `;
+    }
+
+    function treeIcon(x,y,s=1){
+      const trunk = `rgba(255,209,102,0.18)`;
+      const leaf = `rgba(134,218,104,0.24)`;
+      return `
+        <g transform="translate(${x} ${y}) scale(${s})">
+          <path d="M0 10 L0 24" stroke="${trunk}" stroke-width="5" stroke-linecap="round"/>
+          <circle cx="-8" cy="2" r="11" fill="${leaf}"/>
+          <circle cx="7" cy="-2" r="12" fill="${leaf}"/>
+          <circle cx="0" cy="-12" r="10" fill="${leaf}"/>
+        </g>
+      `;
+    }
+
+    function tourLines(tour, byId, kind){
+      if(!tour || tour.length < 2) return '';
+      const ids = tour[0] === tour[tour.length-1] ? tour : tour.concat(tour[0]);
+      let html = '';
+      for(let i=0;i<ids.length-1;i++){
+        const a = byId[ids[i]], b = byId[ids[i+1]];
+        if(a && b) html += `<line class="tourSegment ${kind}" x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}"/>`;
+      }
+      return html;
+    }
+
+    function edgeStateLines(byId){
+      return state.edgeStates.map(edge=>{
+        const a = byId[edge.from], b = byId[edge.to];
+        if(!a || !b) return '';
+        const label = edge.label ? `<title>${edge.label}</title>` : '';
+        const mx = (a.x + b.x) / 2;
+        const my = (a.y + b.y) / 2;
+        const value = Number.isFinite(edge.displayWeight) ? edge.displayWeight : edgeWeight(edge.from, edge.to);
+        const tag = edge.tag ? `${edge.tag}: ${value}` : `${value}`;
+        const labelBox = `<rect class="edgeStateLabelBg" x="${mx-30}" y="${my-17}" width="60" height="20" rx="5"></rect><text class="edgeStateLabel" x="${mx}" y="${my-7}">${tag}</text>`;
+        return `<line class="edgeState ${edge.state}" x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}">${label}</line>${labelBox}`;
+      }).join('');
+    }
+
+    function tourEdges(tour, edgeState, closeTour=true){
+      if(!tour || tour.length < 2) return [];
+      const ids = closeTour && tour[0] !== tour[tour.length-1] ? tour.concat(tour[0]) : tour;
+      const edges = [];
+      for(let i=0;i<ids.length-1;i++){
+        edges.push({
+          from:ids[i],
+          to:ids[i+1],
+          state:edgeState,
+          label:`${cityName(ids[i])} → ${cityName(ids[i+1])}: ${edgeWeight(ids[i],ids[i+1])}`
+        });
+      }
+      return edges;
+    }
+
+    function renderGrowthChart(){
+      const svg = $('growthSvg');
+      const w=780,h=260,pad={l:48,r:24,t:18,b:34};
+      const minN=3, maxN=12;
+      const maxY=Math.log10(factorial(maxN-1));
+      const sx=n=>pad.l+(n-minN)/(maxN-minN)*(w-pad.l-pad.r);
+      const sy=v=>h-pad.b-(Math.log10(Math.max(1,v))/maxY)*(h-pad.t-pad.b);
+      const ns = Array.from({length:maxN-minN+1},(_,i)=>i+minN);
+      const series = [
+        {name:'Nearest Neighbor: n²', color:'#64f0c8', values:ns.map(n=>[n,n*n])},
+        {name:'2-Opt approx: 5n²', color:'#c77dff', values:ns.map(n=>[n,5*n*n])},
+        {name:'Brute force: (n-1)!', color:'#ffd166', values:ns.map(n=>[n,factorial(n-1)])}
+      ];
+      let html = `<rect x="0" y="0" width="${w}" height="${h}" fill="rgba(0,0,0,0.01)"/>`;
+      html += `<line x1="${pad.l}" y1="${h-pad.b}" x2="${w-pad.r}" y2="${h-pad.b}" stroke="rgba(255,255,255,.18)"/>`;
+      html += `<line x1="${pad.l}" y1="${pad.t}" x2="${pad.l}" y2="${h-pad.b}" stroke="rgba(255,255,255,.18)"/>`;
+      for(let n=minN;n<=maxN;n++){
+        html += `<text x="${sx(n)}" y="${h-12}" fill="#b7c0ff" font-size="10" text-anchor="middle">${n}</text>`;
+      }
+      html += `<text x="18" y="24" fill="#b7c0ff" font-size="11">log scale</text>`;
+      html += `<text x="${w/2}" y="${h-4}" fill="#b7c0ff" font-size="11" text-anchor="middle">number of cities n</text>`;
+      series.forEach(s=>{
+        const d = s.values.map((p,i)=>`${i?'L':'M'} ${sx(p[0])} ${sy(p[1])}`).join(' ');
+        html += `<path d="${d}" fill="none" stroke="${s.color}" stroke-width="3" stroke-linecap="round"/>`;
+        s.values.forEach(p=> html += `<circle cx="${sx(p[0])}" cy="${sy(p[1])}" r="3.5" fill="${s.color}"/>`);
+      });
+      series.forEach((s,i)=>{
+        const x=545,y=28+i*22;
+        html += `<rect x="${x}" y="${y-10}" width="10" height="10" rx="2" fill="${s.color}"/>`;
+        html += `<text x="${x+16}" y="${y}" fill="#e8ecff" font-size="12">${s.name}</text>`;
+      });
+      svg.innerHTML = html;
+    }
+
+    const PROOF_STEPS = [
+      {
+        title:'Problem definition',
+        text:'TSP Decision asks: given a complete weighted graph and a bound B, is there a tour that visits every city once, returns to the start, and has total cost at most B?',
+        mode:'definition'
+      },
+      {
+        title:'TSP Decision is in NP',
+        text:'A certificate is just the proposed tour. The verifier checks each vertex appears once, adds the edge weights, and compares the total with B. That takes polynomial time.',
+        mode:'np'
+      },
+      {
+        title:'Start from Hamiltonian Cycle',
+        text:'For NP-hardness, reduce from Hamiltonian Cycle. The left graph is the original HC instance G. We ask whether G has a simple cycle visiting every vertex exactly once.',
+        mode:'source'
+      },
+      {
+        title:'Construct the TSP instance',
+        text:'Build G′ as a complete graph on the same vertices. Edges from the original graph get weight 1. Missing edges are added with weight 2. Set B = n; here n = 4, so B = 4.',
+        mode:'construct'
+      },
+      {
+        title:'Forward direction: HC YES implies TSP YES',
+        text:'If G has the Hamiltonian cycle A-B-C-D-A, then in G′ those four edges all have weight 1. The TSP tour cost is 1+1+1+1 = 4 = B, so TSP answers YES.',
+        mode:'forward'
+      },
+      {
+        title:'Backward direction: TSP YES implies HC YES',
+        text:'Any TSP tour on 4 vertices uses exactly 4 edges. If its cost is at most 4 and every edge has weight 1 or 2, then every used edge must have weight 1. Those edges all existed in G, so they form a Hamiltonian cycle.',
+        mode:'backward'
+      },
+      {
+        title:'Polynomial time and conclusion',
+        text:'The conversion only checks pairs of vertices and assigns weight 1 or 2, so it is polynomial time. Therefore Hamiltonian Cycle ≤p TSP Decision. Since TSP Decision is in NP, it is NP-complete.',
+        mode:'poly'
+      }
+    ];
+    let proofModeStepIndex = 0;
+    const PROOF_GRAPH_PRESETS = {
+      hcYes4: {
+        title:'HC YES: 4-Vertex Cycle',
+        vertices:[{id:'A',x:130,y:100},{id:'B',x:500,y:100},{id:'C',x:500,y:340},{id:'D',x:130,y:340}],
+        edges:[['A','B'],['B','C'],['C','D'],['D','A'],['A','C']],
+        cycle:['A','B','C','D','A']
+      },
+      hcNo4: {
+        title:'HC NO: Broken 4-Vertex Graph',
+        vertices:[{id:'A',x:130,y:100},{id:'B',x:500,y:100},{id:'C',x:500,y:340},{id:'D',x:130,y:340}],
+        edges:[['A','B'],['B','C'],['A','C'],['A','D']],
+        cycle:null
+      },
+      hcYes5: {
+        title:'HC YES: 5-Vertex Classroom Graph',
+        vertices:[{id:'A',x:140,y:95},{id:'B',x:470,y:105},{id:'C',x:545,y:285},{id:'D',x:320,y:365},{id:'E',x:95,y:270}],
+        edges:[['A','B'],['B','C'],['C','D'],['D','E'],['E','A'],['A','C'],['B','D']],
+        cycle:['A','B','C','D','E','A']
+      }
+    };
+
+    function sameUndirectedEdge(a,b){
+      return (a[0] === b[0] && a[1] === b[1]) || (a[0] === b[1] && a[1] === b[0]);
+    }
+
+    function renderMainProofMode(stepIndex=proofModeStepIndex){
+      proofModeStepIndex = Math.max(0, Math.min(PROOF_STEPS.length-1, stepIndex));
+      const step = PROOF_STEPS[proofModeStepIndex];
+      const preset = PROOF_GRAPH_PRESETS[$('proofPreset')?.value || 'hcYes4'];
+      const vertices = preset.vertices;
+      const originalEdges = preset.edges;
+      const allEdges = [];
+      for(let i=0;i<vertices.length;i++){
+        for(let j=i+1;j<vertices.length;j++) allEdges.push([vertices[i].id, vertices[j].id]);
+      }
+      const cycleEdges = preset.cycle ? preset.cycle.slice(0,-1).map((v,i)=>[v,preset.cycle[i+1]]) : [];
+      const byId = Object.fromEntries(vertices.map(v=>[v.id,v]));
+      const showWeights = ['construct','forward','backward','poly'].includes(step.mode);
+      const showMissing = ['construct','backward','poly'].includes(step.mode);
+      const highlightCycle = preset.cycle && ['forward','backward'].includes(step.mode);
+      const leftX = 0, rightX = 320;
+      function shifted(v,dx){ return {x:v.x/2+dx, y:v.y}; }
+      function edgeLine(edge, dx, color, width=3, dash=''){
+        const a=shifted(byId[edge[0]],dx), b=shifted(byId[edge[1]],dx);
+        return `<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="${color}" stroke-width="${width}" stroke-linecap="round" ${dash ? `stroke-dasharray="${dash}"` : ''}/>`;
+      }
+      function label(edge, dx, value, color){
+        const a=shifted(byId[edge[0]],dx), b=shifted(byId[edge[1]],dx);
+        return `<text x="${(a.x+b.x)/2}" y="${(a.y+b.y)/2-5}" fill="${color}" font-size="12" text-anchor="middle" font-weight="850">${value}</text>`;
+      }
+      function drawVertices(dx){
+        return vertices.map(v=>{
+          const p=shifted(v,dx);
+          return `<circle cx="${p.x}" cy="${p.y}" r="18" fill="rgba(106,169,255,.22)" stroke="#6aa9ff" stroke-width="2"/><text x="${p.x}" y="${p.y+4}" fill="#e8ecff" font-size="13" text-anchor="middle" font-weight="850">${v.id}</text>`;
+        }).join('');
+      }
+      function isOriginal(edge){ return originalEdges.some(e=>sameUndirectedEdge(e,edge)); }
+      function isCycle(edge){ return cycleEdges.some(e=>sameUndirectedEdge(e,edge)); }
+      function proofEdgeWeight(a,b){ return isOriginal([a,b]) ? 1 : 2; }
+      function proofTourCost(tour){
+        let total = 0;
+        for(let i=0;i<tour.length-1;i++) total += proofEdgeWeight(tour[i], tour[i+1]);
+        return total;
+      }
+      function proofExactSummary(){
+        const ids = vertices.map(v=>v.id);
+        const start = ids[0];
+        const rest = ids.slice(1);
+        let best = Infinity;
+        let bestTour = [];
+        function visit(prefix, remaining){
+          if(!remaining.length){
+            const tour = [start, ...prefix, start];
+            const cost = proofTourCost(tour);
+            if(cost < best){ best = cost; bestTour = tour; }
+            return;
+          }
+          for(let i=0;i<remaining.length;i++){
+            visit(prefix.concat(remaining[i]), remaining.slice(0,i).concat(remaining.slice(i+1)));
+          }
+        }
+        visit([], rest);
+        return {best, bestTour};
+      }
+      const proofSummary = proofExactSummary();
+      const proofDecision = proofSummary.best <= vertices.length ? 'YES' : 'NO';
+      let stepText = step.text;
+      if(!preset.cycle && step.mode === 'forward'){
+        stepText = `This preset is an HC NO example, so there is no all-original-edge Hamiltonian cycle to carry forward. In the constructed TSP graph, the exact best tour is ${proofSummary.bestTour.join(' → ')} with cost ${proofSummary.best}, which is greater than B=${vertices.length}.`;
+      }else if(!preset.cycle && step.mode === 'backward'){
+        stepText = `For this HC NO preset, every TSP tour must use at least one missing edge of weight 2. Since B=${vertices.length}, the best possible TSP tour costs ${proofSummary.best} > B, so the constructed TSP instance is also NO.`;
+      }else if(step.mode === 'poly'){
+        stepText = `The conversion checks every unordered pair of vertices, assigns weight 1 or 2, and outputs a complete weighted graph. That takes O(n²) time. For this preset, exact checking gives TSP Decision = ${proofDecision} with best cost ${proofSummary.best} and B=${vertices.length}.`;
+      }
+      let html = '<rect x="0" y="0" width="640" height="470" fill="rgba(0,0,0,0.01)"/>';
+      html += '<text x="160" y="34" fill="#e8ecff" font-size="15" text-anchor="middle" font-weight="850">Original HC graph G</text>';
+      html += '<text x="480" y="34" fill="#e8ecff" font-size="15" text-anchor="middle" font-weight="850">Constructed TSP graph G′</text>';
+      html += originalEdges.map(edge=>edgeLine(edge,leftX,highlightCycle && isCycle(edge)?'#ffd166':'rgba(100,240,200,.78)',highlightCycle && isCycle(edge)?6:4)).join('');
+      html += drawVertices(leftX);
+      html += allEdges.map(edge=>{
+        const orig = isOriginal(edge);
+        if(!orig && !showMissing) return '';
+        const cyc = highlightCycle && isCycle(edge);
+        const color = cyc ? '#ffd166' : (orig ? 'rgba(100,240,200,.72)' : 'rgba(255,92,122,.62)');
+        return edgeLine(edge,rightX,color,cyc?6:(orig?4:2),orig?'':'5 5') +
+          (showWeights ? label(edge,rightX,orig?1:2,orig?'#64f0c8':'#ff5c7a') : '');
+      }).join('');
+      html += drawVertices(rightX);
+      html += `<text x="480" y="435" fill="#b7c0ff" font-size="12" text-anchor="middle">B = n = ${vertices.length} · best TSP cost = ${proofSummary.best} (${proofDecision})</text>`;
+      html += `<text x="160" y="435" fill="#b7c0ff" font-size="12" text-anchor="middle">${preset.cycle ? `Cycle: ${preset.cycle.join(' → ')}` : 'HC NO: no all-original-edge cycle'}</text>`;
+      $('graphSvg').innerHTML = html;
+      $('mainProofExplain').innerHTML = `<b>${step.title}:</b> ${stepText}`;
+      $('mainProofProgress').textContent = `Step ${proofModeStepIndex+1} / ${PROOF_STEPS.length}`;
+      highlightLine(proofModeStepIndex < 6 ? proofModeStepIndex : 6);
+      $('phaseNote').textContent = stepText;
+      $('explain').innerHTML = `<b>Proof Step:</b> ${stepText}`;
+    }
+
+    function setStatus(text, cls=''){
+      $('status').textContent = text;
+      $('statusDot').className = `statusDot ${cls}`;
+    }
+
+    function formatElapsed(ms){
+      if(ms > 0 && ms < 1) return '<1 ms';
+      if(ms < 10) return `${ms.toFixed(2)} ms`;
+      if(ms < 1000) return `${Math.round(ms)} ms`;
+      return `${(ms / 1000).toFixed(2)} s`;
+    }
+
+    function renderStats(){
+      const n = state.cities.length;
+      const exactCost = Number.isFinite(state.exactBestCost) ? state.exactBestCost : tourCost(state.exactTour);
+      const greedyCost = tourCost(state.greedyTour);
+      const optCost = tourCost(state.optTour);
+      const displayedTour = state.activeTour.length ? state.activeTour : simpleTour();
+      const currentCost = state.currentCost ?? tourCost(displayedTour);
+      const tourIsPartial = state.activeTour.length > 0 &&
+        state.activeTour.length < state.cities.length + 1 &&
+        state.activeTour[0] !== state.activeTour[state.activeTour.length - 1];
+      const B = Number($('bound').value);
+      $('cityCount').textContent = n;
+      $('tourCount').textContent = n > 1 ? factorial(n-1).toLocaleString() : '0';
+      $('stepCount').textContent = `${state.stepIndex} / ${state.steps.length}`;
+      $('checkedCount').textContent = state.permutationsChecked.toLocaleString();
+      $('comparisonCount').textContent = state.comparisonsCount.toLocaleString();
+      $('swapCount').textContent = state.swapsTested.toLocaleString();
+      $('improvementCount').textContent = state.improvementsAccepted.toLocaleString();
+      $('elapsedTime').textContent = formatElapsed(state.elapsedMs);
+      $('boundStat').textContent = Number.isFinite(B) ? B : '--';
+      $('currentTour').textContent = tourNames(displayedTour, !tourIsPartial);
+      $('currentCost').textContent = Number.isFinite(currentCost) ? currentCost : 'pending';
+      $('costBefore').textContent = Number.isFinite(state.costBefore) ? state.costBefore : '--';
+      $('costAfter').textContent = Number.isFinite(state.costAfter) ? state.costAfter : '--';
+      const improvementBase = Number.isFinite(state.initialTwoOptCost)
+        ? state.initialTwoOptCost
+        : (state.mode === 'twoopt' && Number.isFinite(state.costBefore) ? state.costBefore : null);
+      const improvementPct = Number.isFinite(improvementBase) && improvementBase > 0 && Number.isFinite(state.costAfter)
+        ? Math.max(0, ((improvementBase - state.costAfter) / improvementBase * 100))
+        : null;
+      $('improvementPct').textContent = Number.isFinite(improvementPct) ? `${improvementPct.toFixed(1)}%` : '--';
+      const hasCompleteActiveTour = state.activeTour.length >= state.cities.length + 1 &&
+        state.activeTour[0] === state.activeTour[state.activeTour.length - 1];
+      let unvisitedText = 'none';
+      if(state.mode === 'nearest'){
+        unvisitedText = state.unvisitedIds.length ? state.unvisitedIds.map(cityName).join(', ') : 'none';
+      }else if(state.mode === 'bruteforce'){
+        unvisitedText = 'not tracked - checking full tours';
+      }else if(state.mode === 'twoopt' || state.mode === 'compare'){
+        unvisitedText = hasCompleteActiveTour || state.mode === 'compare' ? 'none - tour is complete' : 'none';
+      }else if(state.mode === 'proof'){
+        unvisitedText = 'not used in proof mode';
+      }
+      $('unvisitedList').textContent = unvisitedText;
+      $('bestExact').textContent = exactCost ? exactCost : 'pending';
+      const decisionCost = state.mode === 'bruteforce'
+        ? (Number.isFinite(state.exactBestCost) ? state.exactBestCost : null)
+        : currentCost;
+      $('decision').innerHTML = decisionCost && Number.isFinite(B) ? (decisionCost <= B ? '<span class="badge yes">YES</span>' : '<span class="badge no">NO</span>') : 'unknown';
+      $('exactCost').textContent = exactCost || '--';
+      $('greedyCost').textContent = greedyCost || '--';
+      $('optCost').textContent = optCost || '--';
+    }
+
+    function updateUI(){
+      renderGraph();
+      renderStats();
+      renderAlgorithmAnalysis();
+      renderMatrixHighlights();
+    }
+
+    function applyPreset(){
+      const p = PRESETS[$('preset').value];
+      state.cities = p.cities.map(c=>({...c}));
+      $('bound').value = p.bound;
+      $('cityInput').value = state.cities.map(c=>`${c.name},${c.x},${c.y}`).join('\n');
+      buildWeights();
+      renderStartCities();
+      clearTours();
+      renderMatrix();
+      renderGrowthChart();
+      resetComparisonCards();
+      validateCurrentInput();
+      updateUI();
+      $('phaseNote').textContent = 'Preset loaded. Click Build Steps to prepare a teaching trace.';
+    }
+
+    function clearTours(){
+      state.steps = [];
+      state.stepIndex = 0;
+      state.activeCityId = null;
+      state.activeTour = [];
+      state.exactTour = [];
+      state.greedyTour = [];
+      state.optTour = [];
+      state.edgeStates = [];
+      state.matrixHighlights = [];
+      state.currentCost = null;
+      state.exactBestCost = Infinity;
+      state.permutationsChecked = 0;
+      state.comparisonsCount = 0;
+      state.swapsTested = 0;
+      state.improvementsAccepted = 0;
+      state.costBefore = null;
+      state.costAfter = null;
+      state.initialTwoOptCost = null;
+      state.operationsCount = 0;
+      state.elapsedMs = 0;
+      state.buildStartedAt = 0;
+      state.unvisitedIds = state.mode === 'nearest'
+        ? state.cities.map(c=>c.id).filter(id=>id !== Number($('startCity').value))
+        : [];
+      state.playing = false;
+      state.playToken++;
+      setStatus('Idle');
+      highlightLine(-1);
+    }
+
+    function setMode(mode){
+      state.mode = mode;
+      document.querySelectorAll('.modeBtn').forEach(btn=>btn.classList.toggle('active', btn.dataset.mode === mode));
+      const titles = {
+        bruteforce:'Brute Force Exact Solver',
+        nearest:'Nearest Neighbor Greedy Heuristic',
+        twoopt:'Greedy + 2-Opt Local Search Improvement',
+        compare:'Side-by-Side Comparison Mode',
+        proof:'NP-Completeness Proof Converter'
+      };
+      $('modeTitle').textContent = titles[mode];
+      document.body.classList.toggle('proofMode', mode === 'proof');
+      $('mainProofPanel').style.display = mode === 'proof' ? 'block' : 'none';
+      renderPseudocode();
+      clearTours();
+      updateUI();
+      resetComparisonCards();
+      if(mode === 'proof'){
+        proofModeStepIndex = 0;
+        renderMainProofMode(0);
+      }else{
+        $('phaseNote').textContent = 'Mode changed. Build Steps will create the teaching trace for this panel.';
+        $('explain').innerHTML = '<b>Step Explanation:</b> Click <b>Build Steps</b> to generate steps for this algorithm mode.';
+      }
+    }
+
+    function resetComparisonCards(){
+      $('exactMeta').innerHTML = 'Enumerates all tours. This is the decision authority for small n.';
+      $('greedyMeta').innerHTML = 'Chooses the closest unvisited city each time. Fast, but not guaranteed optimal.';
+      $('optMeta').innerHTML = 'Swaps crossing edges when a shorter tour is found. Local search, not proof.';
+      $('approxPanel').style.display = 'none';
+      $('approxContent').innerHTML = '';
+      $('compareConceptPanel').style.display = 'none';
+      $('compareConceptContent').innerHTML = '';
+    }
+
+    function buildSteps(){
+      if(state.mode === 'proof'){
+        renderMainProofMode(0);
+        setStatus('Ready','ready');
+        return;
+      }
+      const validation = validateCurrentInput();
+      if(!validation.ok){
+        setStatus('Input issue','');
+        $('explain').innerHTML = `<b>Input issue:</b> ${validation.issues.join(' ')}`;
+        return;
+      }
+      if(state.mode === 'bruteforce') buildBruteForceSteps();
+      else if(state.mode === 'nearest') buildNearestNeighborSteps();
+      else if(state.mode === 'twoopt') buildTwoOptSteps();
+      else if(state.mode === 'compare') buildComparisonMode();
+      else buildPlaceholderSteps();
+    }
+
+    function buildBruteForceSteps(){
+      const ids = state.cities.map(c=>c.id);
+      const startId = Number($('startCity').value);
+      const B = Number($('bound').value);
+      const total = factorial(state.cities.length - 1);
+      clearTours();
+
+      if(state.cities.length > 9){
+        setStatus('Too large','');
+        $('phaseNote').textContent = `Brute force is limited to n ≤ 9. This instance has ${state.cities.length} cities, which means ${(total).toLocaleString()} tours after fixing the start city.`;
+        $('explain').innerHTML = `<b>Educational warning:</b> Exact brute force would need to check ${(total).toLocaleString()} candidate tours. Use 9 or fewer cities for the step-by-step exact solver, or switch to a heuristic mode to discuss practical approaches.`;
+        updateUI();
+        return;
+      }
+
+      const remaining = ids.filter(id=>id !== startId);
+      const steps = [];
+      let checked = 0;
+      let operations = 0;
+      let bestCost = Infinity;
+      let bestTour = [];
+      const buildStart = performance.now();
+
+      function visitPermutation(prefix, rest){
+        if(rest.length === 0){
+          const tour = [startId, ...prefix, startId];
+          const candidateCost = tourCost(tour, false);
+          checked++;
+          operations += tour.length - 1;
+          const previousBestCost = bestCost;
+          const improved = candidateCost < bestCost;
+          if(improved){
+            bestCost = candidateCost;
+            bestTour = tour.slice();
+          }
+          const candidateDecision = candidateCost <= B ? 'YES witness' : 'NO for this tour';
+          const exactDecision = bestCost <= B ? 'YES' : 'NO so far';
+          steps.push({
+            type:improved ? 'newBest' : 'candidate',
+            tour:tour.slice(),
+            candidateCost,
+            bestTour:bestTour.slice(),
+            bestCost,
+            costBefore: Number.isFinite(previousBestCost) ? previousBestCost : null,
+            costAfter: bestCost,
+            activeLine: candidateCost <= B ? 5 : 4,
+            line: candidateCost <= B ? 5 : 4,
+            explanation:`Candidate ${checked.toLocaleString()} / ${total.toLocaleString()}: ${tourNames(tour, false)} has cost ${candidateCost}. The report pseudocode would ${candidateCost <= B ? `return YES here because ${candidateCost} ≤ B=${B}` : `continue because ${candidateCost} > B=${B}`}. The explorer still finishes enumeration to show the exact optimum; current exact decision is ${exactDecision}.`,
+            text:`Candidate ${checked.toLocaleString()} / ${total.toLocaleString()}: ${tourNames(tour, false)} has cost ${candidateCost}. Candidate decision: ${candidateDecision}. Current exact decision: ${exactDecision}.`,
+            operations,
+            permutationsChecked:checked,
+            totalPermutations:total,
+            elapsedMs:performance.now() - buildStart,
+            edges:tourEdges(tour, candidateCost <= B ? 'accepted' : 'rejected')
+          });
+          return;
+        }
+        for(let i=0;i<rest.length;i++){
+          const next = rest[i];
+          const nextRest = rest.slice(0,i).concat(rest.slice(i+1));
+          visitPermutation(prefix.concat(next), nextRest);
+        }
+      }
+
+      steps.push({
+        type:'init',
+        tour:[startId],
+        candidateCost:0,
+        bestTour:[],
+        bestCost:Infinity,
+        activeLine:1,
+        line:1,
+        explanation:`Fix ${cityName(startId)} as the start city. This removes duplicate rotations, so exact search checks (n - 1)! = ${total.toLocaleString()} tours instead of n! tours.`,
+        text:`Fix ${cityName(startId)} as the start city. This removes duplicate rotations, so exact search checks (n - 1)! = ${total.toLocaleString()} tours instead of n! tours.`,
+        operations:0,
+        permutationsChecked:0,
+        totalPermutations:total,
+        elapsedMs:0,
+        edges:[]
+      });
+      visitPermutation([], remaining);
+
+      steps.push({
+        type:'done',
+        tour:bestTour.slice(),
+        candidateCost:bestCost,
+        bestTour:bestTour.slice(),
+        bestCost,
+        activeLine:6,
+        line:6,
+        explanation:`Brute force complete. Checked all ${checked.toLocaleString()} tours. Best cost is ${bestCost}, so the TSP decision answer for B = ${B} is ${bestCost <= B ? 'YES' : 'NO'}.`,
+        text:`Brute force complete. Checked all ${checked.toLocaleString()} tours. Best cost is ${bestCost}, so the TSP decision answer for B = ${B} is ${bestCost <= B ? 'YES' : 'NO'}.`,
+        operations,
+        permutationsChecked:checked,
+        totalPermutations:total,
+        elapsedMs:performance.now() - buildStart,
+        edges:tourEdges(bestTour,'current')
+      });
+
+      state.steps = steps;
+      state.stepIndex = 0;
+      state.exactBestCost = Infinity;
+      state.permutationsChecked = 0;
+      state.operationsCount = 0;
+      state.costBefore = null;
+      state.costAfter = null;
+      state.initialTwoOptCost = null;
+      state.improvementsAccepted = 0;
+      state.elapsedMs = 0;
+      setStatus('Ready','ready');
+      $('phaseNote').textContent = `${steps.length} brute-force steps generated from ${total.toLocaleString()} candidate tours. Use Step or Play to inspect the exact solver.`;
+      $('explain').innerHTML = `<b>Ready:</b> Exact brute force generated ${total.toLocaleString()} candidate tour steps after fixing ${cityName(startId)} as the start city.`;
+      updateUI();
+    }
+
+    function buildNearestNeighborSteps(){
+      const ids = state.cities.map(c=>c.id);
+      const startId = Number($('startCity').value);
+      const B = Number($('bound').value);
+      clearTours();
+
+      const steps = [];
+      const buildStart = performance.now();
+      const tour = [startId];
+      let unvisited = ids.filter(id=>id !== startId);
+      let current = startId;
+      let currentCost = 0;
+      let comparisons = 0;
+      const tieMode = $('tieMode').value;
+
+      steps.push({
+        type:'greedyInit',
+        tour:tour.slice(),
+        currentCost,
+        candidateCost:currentCost,
+        activeLine:1,
+        line:1,
+        explanation:`Start Nearest Neighbor at ${cityName(startId)}. The tour begins with ${cityName(startId)}, and every other city is unvisited.`,
+        text:`Start Nearest Neighbor at ${cityName(startId)}. The tour begins with ${cityName(startId)}, and every other city is unvisited.`,
+        comparisons,
+        operations:comparisons,
+        unvisited:unvisited.slice(),
+        elapsedMs:0,
+        edges:[]
+      });
+
+      steps.push({
+        type:'unvisited',
+        tour:tour.slice(),
+        currentCost,
+        candidateCost:currentCost,
+        activeLine:2,
+        line:2,
+        explanation:`Unvisited cities: ${unvisited.map(cityName).join(', ')}. Greedy will only choose from this list.`,
+        text:`Unvisited cities: ${unvisited.map(cityName).join(', ')}. Greedy will only choose from this list.`,
+        comparisons,
+        operations:comparisons,
+        unvisited:unvisited.slice(),
+        elapsedMs:performance.now() - buildStart,
+        edges:[]
+      });
+
+      while(unvisited.length){
+        let nearest = null;
+        let nearestDist = Infinity;
+        const consideredEdges = [];
+        const tied = [];
+
+        unvisited.forEach(candidate => {
+          const d = edgeWeight(current, candidate);
+          comparisons++;
+          consideredEdges.push({
+            from:current,
+            to:candidate,
+            state:'candidate',
+            label:`${cityName(current)} → ${cityName(candidate)}: ${d}`
+          });
+          if(d === nearestDist) tied.push(candidate);
+          if(chooseTie(nearest, candidate, current, tieMode)){
+            nearest = candidate;
+            nearestDist = d;
+          }
+          const tieText = tied.length && tieMode === 'explain' ? ` Tie detected at distance ${nearestDist}; using input-order tie break for this run.` : '';
+          const currentMatrixEdges = consideredEdges.slice(0, -1).concat([{...consideredEdges[consideredEdges.length - 1], state:'current'}]);
+          steps.push({
+            type:'considerCandidate',
+            tour:tour.slice(),
+            candidateCost:currentCost,
+            currentCost,
+            costBefore:currentCost,
+            costAfter:currentCost + d,
+            activeLine:4,
+            line:4,
+            explanation:`Compare ${cityName(current)} to unvisited city ${cityName(candidate)}: distance ${d}. Best so far in this scan is ${cityName(nearest)} with distance ${nearestDist}; the final choice is made only after every unvisited city is checked.${tieText}`,
+            text:`Compare ${cityName(current)} to unvisited city ${cityName(candidate)}: distance ${d}. Best so far in this scan is ${cityName(nearest)} with distance ${nearestDist}; the final choice is made only after every unvisited city is checked.${tieText}`,
+            comparisons,
+            operations:comparisons,
+            unvisited:unvisited.slice(),
+            elapsedMs:performance.now() - buildStart,
+            matrixHighlights:currentMatrixEdges,
+            edges:tourEdges(tour,'accepted',false).concat(consideredEdges.slice())
+          });
+        });
+
+        steps.push({
+          type:'chooseNearest',
+          tour:tour.slice(),
+          candidateCost:currentCost,
+          currentCost,
+          costBefore:currentCost,
+          costAfter:currentCost + nearestDist,
+          activeLine:5,
+          line:5,
+          explanation:`From ${cityName(current)}, the closest unvisited city is ${cityName(nearest)} with distance ${nearestDist}.`,
+          text:`From ${cityName(current)}, the closest unvisited city is ${cityName(nearest)} with distance ${nearestDist}.`,
+          comparisons,
+          operations:comparisons,
+          unvisited:unvisited.slice(),
+          elapsedMs:performance.now() - buildStart,
+          edges:tourEdges(tour,'accepted',false).concat([{from:current,to:nearest,state:'current',label:`Chosen nearest: ${nearestDist}`}])
+        });
+
+        const previous = current;
+        const previousCost = currentCost;
+        tour.push(nearest);
+        unvisited = unvisited.filter(id=>id !== nearest);
+        currentCost += nearestDist;
+        current = nearest;
+
+        steps.push({
+          type:'moveToChosen',
+          tour:tour.slice(),
+          candidateCost:currentCost,
+          currentCost,
+          costBefore:previousCost,
+          costAfter:currentCost,
+          activeLine:6,
+          line:6,
+          explanation:`Move from ${cityName(previous)} to ${cityName(nearest)} and add it to the tour. Running path cost is now ${currentCost}. Unvisited: ${unvisited.length ? unvisited.map(cityName).join(', ') : 'none'}.`,
+          text:`Move from ${cityName(previous)} to ${cityName(nearest)} and add it to the tour. Running path cost is now ${currentCost}. Unvisited: ${unvisited.length ? unvisited.map(cityName).join(', ') : 'none'}.`,
+          comparisons,
+          operations:comparisons,
+          unvisited:unvisited.slice(),
+          elapsedMs:performance.now() - buildStart,
+          edges:tourEdges(tour,'accepted',false)
+        });
+      }
+
+      const returnDist = edgeWeight(current, startId);
+      const finalTour = tour.concat(startId);
+      const finalCost = currentCost + returnDist;
+      steps.push({
+        type:'returnToStart',
+        tour:finalTour.slice(),
+        greedy:finalTour.slice(),
+        candidateCost:finalCost,
+        currentCost:finalCost,
+        costBefore:currentCost,
+        costAfter:finalCost,
+        activeLine:8,
+        line:8,
+        explanation:`All cities are visited. Return from ${cityName(current)} to ${cityName(startId)} with distance ${returnDist}. Final greedy tour cost is ${finalCost}, so for B = ${B} the heuristic reports ${finalCost <= B ? 'YES' : 'NO'}.`,
+        text:`All cities are visited. Return from ${cityName(current)} to ${cityName(startId)} with distance ${returnDist}. Final greedy tour cost is ${finalCost}, so for B = ${B} the heuristic reports ${finalCost <= B ? 'YES' : 'NO'}.`,
+        comparisons,
+        operations:comparisons,
+        unvisited:[],
+        elapsedMs:performance.now() - buildStart,
+        edges:[{from:current,to:startId,state:finalCost <= B ? 'accepted' : 'rejected',label:`Return edge: ${returnDist}`}]
+      });
+
+      state.steps = steps;
+      state.stepIndex = 0;
+      state.comparisonsCount = 0;
+      state.operationsCount = 0;
+      state.costBefore = null;
+      state.costAfter = null;
+      state.initialTwoOptCost = null;
+      state.improvementsAccepted = 0;
+      state.elapsedMs = 0;
+      setStatus('Ready','ready');
+      $('phaseNote').textContent = `${steps.length} nearest-neighbor steps generated. The solver will compare each current city to all unvisited cities.`;
+      $('explain').innerHTML = `<b>Ready:</b> Nearest Neighbor will start at ${cityName(startId)} and make ${comparisons.toLocaleString()} distance comparisons before closing the tour.`;
+      updateUI();
+    }
+
+    function buildTwoOptSteps(){
+      const startId = Number($('startCity').value);
+      const B = Number($('bound').value);
+      clearTours();
+
+      const seed = nearestNeighborTour(startId);
+      let tour = seed.tour.slice();
+      const initialCost = seed.cost;
+      let currentCost = initialCost;
+      let swapsTested = 0;
+      let improvements = 0;
+      const maxIterations = Math.max(1, state.cities.length * state.cities.length);
+      let iteration = 0;
+      const steps = [];
+      const buildStart = performance.now();
+
+      steps.push({
+        type:'twoOptInit',
+        tour:tour.slice(),
+        opt:tour.slice(),
+        candidateCost:currentCost,
+        currentCost,
+        costBefore:currentCost,
+        costAfter:currentCost,
+        initialTwoOptCost:initialCost,
+        swapsTested,
+        improvementsAccepted:improvements,
+        activeLine:1,
+        line:1,
+        explanation:`2-Opt starts from the Nearest Neighbor tour ${tourNames(tour, false)} with cost ${currentCost}. It is local search: it tries to improve this tour, but it is not guaranteed to find the global optimum.`,
+        text:`2-Opt starts from the Nearest Neighbor tour ${tourNames(tour, false)} with cost ${currentCost}. It is local search: it tries to improve this tour, but it is not guaranteed to find the global optimum.`,
+        operations:swapsTested,
+        elapsedMs:0,
+        edges:tourEdges(tour,'current')
+      });
+
+      let improved = true;
+      while(improved && iteration < maxIterations){
+        improved = false;
+        iteration++;
+        let acceptedThisPass = false;
+
+        for(let i=0;i<tour.length-3 && !acceptedThisPass;i++){
+          for(let k=i+2;k<tour.length-1 && !acceptedThisPass;k++){
+            if(i === 0 && k === tour.length-2) continue;
+
+            const a = tour[i], b = tour[i+1], c = tour[k], d = tour[k+1];
+            const removedCost = edgeWeight(a,b) + edgeWeight(c,d);
+            const addedCost = edgeWeight(a,c) + edgeWeight(b,d);
+            const afterCost = currentCost - removedCost + addedCost;
+            const delta = addedCost - removedCost;
+            const proposedTour = twoOptSwap(tour, i + 1, k);
+            swapsTested++;
+
+            const removedEdges = [
+              {from:a,to:b,state:'rejected',tag:'old',displayWeight:edgeWeight(a,b),label:`Remove old edge ${cityName(a)} → ${cityName(b)} (${edgeWeight(a,b)})`},
+              {from:c,to:d,state:'rejected',tag:'old',displayWeight:edgeWeight(c,d),label:`Remove old edge ${cityName(c)} → ${cityName(d)} (${edgeWeight(c,d)})`}
+            ];
+            const proposedEdges = [
+              {from:a,to:c,state:'current',tag:'new',displayWeight:edgeWeight(a,c),label:`Test new edge ${cityName(a)} → ${cityName(c)} (${edgeWeight(a,c)})`},
+              {from:b,to:d,state:delta < 0 ? 'accepted' : 'candidate',tag:'new',displayWeight:edgeWeight(b,d),label:`Test new edge ${cityName(b)} → ${cityName(d)} (${edgeWeight(b,d)})`}
+            ];
+            const oldText = `old edges (${cityName(a)}, ${cityName(b)})=${edgeWeight(a,b)} and (${cityName(c)}, ${cityName(d)})=${edgeWeight(c,d)}`;
+            const newText = `new edges (${cityName(a)}, ${cityName(c)})=${edgeWeight(a,c)} and (${cityName(b)}, ${cityName(d)})=${edgeWeight(b,d)}`;
+
+            steps.push({
+              type:'testEdgePair',
+              tour:tour.slice(),
+              opt:tour.slice(),
+              candidateCost:currentCost,
+              currentCost,
+              costBefore:currentCost,
+              costAfter:afterCost,
+              initialTwoOptCost:initialCost,
+              swapsTested,
+              improvementsAccepted:improvements,
+              activeLine:5,
+              line:5,
+              explanation:`Choose two non-adjacent tour edges to remove: ${oldText}. In the distance matrix, the red cells are the old edge costs. Removed cost = ${removedCost}.`,
+              text:`Choose two non-adjacent tour edges to remove: ${oldText}. Removed cost = ${removedCost}.`,
+              operations:swapsTested,
+              elapsedMs:performance.now() - buildStart,
+              matrixHighlights:removedEdges,
+              edges:tourEdges(tour,'accepted').concat(removedEdges)
+            });
+
+            steps.push({
+              type:'showProposedSwap',
+              tour:proposedTour.slice(),
+              opt:proposedTour.slice(),
+              candidateCost:afterCost,
+              currentCost:afterCost,
+              costBefore:currentCost,
+              costAfter:afterCost,
+              initialTwoOptCost:initialCost,
+              swapsTested,
+              improvementsAccepted:improvements,
+              activeLine:6,
+              line:6,
+              explanation:`Now test the replacement edges: ${newText}. This reverses segment ${cityName(b)} through ${cityName(c)}. Delta = new cost - old cost = ${addedCost} - ${removedCost} = ${delta}; ${delta < 0 ? 'negative means shorter, so accept this swap.' : 'not negative means the replacement is not better.'}`,
+              text:`Test replacement edges ${newText}. Delta = ${delta}; ${delta < 0 ? 'accept' : 'reject'}.`,
+              operations:swapsTested,
+              elapsedMs:performance.now() - buildStart,
+              matrixHighlights:removedEdges.concat(proposedEdges),
+              edges:removedEdges.concat(proposedEdges)
+            });
+
+            if(delta < 0){
+              tour = proposedTour;
+              currentCost = afterCost;
+              improvements++;
+              improved = true;
+              acceptedThisPass = true;
+              steps.push({
+                type:'acceptImprovement',
+                tour:tour.slice(),
+                opt:tour.slice(),
+                candidateCost:currentCost,
+                currentCost,
+                costBefore:currentCost - delta,
+                costAfter:currentCost,
+                initialTwoOptCost:initialCost,
+                swapsTested,
+                improvementsAccepted:improvements,
+                activeLine:8,
+                line:8,
+                explanation:`Accept the 2-Opt swap: replace ${oldText} with ${newText}. Cost improves from ${currentCost - delta} to ${currentCost}, a saving of ${Math.abs(delta)}. Restart the scan because the tour changed.`,
+                text:`Accept swap: replace ${oldText} with ${newText}. Cost improves to ${currentCost}.`,
+                operations:swapsTested,
+                elapsedMs:performance.now() - buildStart,
+                matrixHighlights:proposedEdges.map(edge=>({...edge,state:'accepted'})),
+                edges:tourEdges(tour,'accepted')
+              });
+            } else {
+              steps.push({
+                type:'rejectNonImprovement',
+                tour:tour.slice(),
+                opt:tour.slice(),
+                candidateCost:currentCost,
+                currentCost,
+                costBefore:currentCost,
+                costAfter:afterCost,
+                initialTwoOptCost:initialCost,
+                swapsTested,
+                improvementsAccepted:improvements,
+                activeLine:6,
+                line:6,
+                explanation:`Reject this swap: replacing ${oldText} with ${newText} would change the cost from ${currentCost} to ${afterCost}. 2-Opt only accepts strictly improving swaps.`,
+                text:`Reject swap: ${newText} is not cheaper than ${oldText}.`,
+                operations:swapsTested,
+                elapsedMs:performance.now() - buildStart,
+                matrixHighlights:removedEdges.concat(proposedEdges.map(edge=>({...edge,state:'candidate'}))),
+                edges:removedEdges.concat(proposedEdges.map(edge=>({...edge,state:'candidate'})))
+              });
+            }
+          }
+        }
+      }
+
+      const stoppedByLimit = improved && iteration >= maxIterations;
+      const improvementPct = initialCost > 0 ? ((initialCost - currentCost) / initialCost * 100) : 0;
+      const stopReason = stoppedByLimit
+        ? `The max iteration limit (${maxIterations}) was reached, so the search stops with the best local tour found so far.`
+        : 'No improving 2-Opt swap remains, so this is a local optimum.';
+      steps.push({
+        type:'localOptimum',
+        tour:tour.slice(),
+        opt:tour.slice(),
+        candidateCost:currentCost,
+        currentCost,
+        costBefore:initialCost,
+        costAfter:currentCost,
+        initialTwoOptCost:initialCost,
+        swapsTested,
+        improvementsAccepted:improvements,
+        activeLine:9,
+        line:9,
+        explanation:`${stopReason} Tested ${swapsTested.toLocaleString()} swaps and accepted ${improvements.toLocaleString()} improvement(s). Cost changed from ${initialCost} to ${currentCost} (${improvementPct.toFixed(1)}% improvement). 2-Opt is local search, not a proof of global optimality. For B = ${B}, this tour gives ${currentCost <= B ? 'YES' : 'NO'} heuristically.`,
+        text:`${stopReason} Tested ${swapsTested.toLocaleString()} swaps and accepted ${improvements.toLocaleString()} improvement(s). Cost changed from ${initialCost} to ${currentCost} (${improvementPct.toFixed(1)}% improvement). 2-Opt is local search, not a proof of global optimality. For B = ${B}, this tour gives ${currentCost <= B ? 'YES' : 'NO'} heuristically.`,
+        operations:swapsTested,
+        elapsedMs:performance.now() - buildStart,
+        edges:tourEdges(tour,'current')
+      });
+
+      state.steps = steps;
+      state.stepIndex = 0;
+      state.currentCost = initialCost;
+      state.swapsTested = 0;
+      state.improvementsAccepted = 0;
+      state.costBefore = initialCost;
+      state.costAfter = initialCost;
+      state.initialTwoOptCost = initialCost;
+      state.elapsedMs = 0;
+      setStatus('Ready','ready');
+      $('phaseNote').textContent = `${steps.length} Greedy + 2-Opt steps generated: first use the Nearest Neighbor tour, then improve it with local edge swaps.`;
+      $('explain').innerHTML = `<b>Ready:</b> 2-Opt will start from Nearest Neighbor cost ${initialCost}, test non-adjacent edge pairs, and accept only improving reversals.`;
+      updateUI();
+    }
+
+    function buildComparisonMode(){
+      clearTours();
+      const startId = Number($('startCity').value);
+      const B = Number($('bound').value);
+      const exact = bruteForceSummary(startId);
+      const greedyStarted = performance.now();
+      const greedy = nearestNeighborTour(startId);
+      greedy.runtime = performance.now() - greedyStarted;
+      greedy.operations = greedy.comparisons;
+      const opt = twoOptSummaryFromTour(greedy.tour);
+      const optimum = exact.skipped ? null : exact.cost;
+
+      state.greedyTour = greedy.tour.slice();
+      state.optTour = opt.tour.slice();
+      state.activeTour = opt.tour.slice();
+      state.currentCost = opt.cost;
+      state.comparisonsCount = greedy.comparisons;
+      state.swapsTested = opt.swaps;
+      state.improvementsAccepted = opt.improvements;
+      state.costBefore = opt.initialCost;
+      state.costAfter = opt.cost;
+      state.initialTwoOptCost = opt.initialCost;
+      state.elapsedMs = (exact.skipped ? 0 : exact.runtime) + greedy.runtime + opt.runtime;
+      if(!exact.skipped){
+        state.exactTour = exact.tour.slice();
+        state.exactBestCost = exact.cost;
+        state.permutationsChecked = exact.checked;
+      }
+
+      $('exactCost').textContent = exact.skipped ? '--' : exact.cost;
+      $('greedyCost').textContent = greedy.cost;
+      $('optCost').textContent = opt.cost;
+      $('exactMeta').innerHTML = exact.skipped
+        ? `<b>Skipped.</b><br>${exact.reason}<br>Factorial growth makes exact search inappropriate here.`
+        : comparisonMeta(exact.tour, exact.cost, exact.operations, exact.runtime, B, 0, 'Optimal baseline');
+      $('greedyMeta').innerHTML = comparisonMeta(greedy.tour, greedy.cost, greedy.operations, greedy.runtime, B, optimum === null ? null : greedy.cost - optimum, 'Greedy heuristic');
+      $('optMeta').innerHTML = comparisonMeta(opt.tour, opt.cost, opt.operations, opt.runtime, B, optimum === null ? null : opt.cost - optimum, `2-Opt accepted ${opt.improvements} improvement(s)`);
+      renderApproximationAnalysis(exact, greedy, opt);
+
+      state.steps = [{
+        type:'comparisonSummary',
+        tour:opt.tour.slice(),
+        greedy:greedy.tour.slice(),
+        opt:opt.tour.slice(),
+        exact:exact.skipped ? [] : exact.tour.slice(),
+        bestTour:exact.skipped ? [] : exact.tour.slice(),
+        bestCost:exact.skipped ? Infinity : exact.cost,
+        candidateCost:opt.cost,
+        activeLine:4,
+        line:4,
+        explanation:exact.skipped
+          ? `Comparison complete without brute force. Exact search was skipped because ${(factorial(state.cities.length - 1)).toLocaleString()} tours would be required. Greedy cost is ${greedy.cost}; 2-Opt cost is ${opt.cost}.`
+          : `Comparison complete. Exact optimum is ${exact.cost}; Greedy cost is ${greedy.cost}; Greedy + 2-Opt cost is ${opt.cost}. Gaps are shown in the cards.`,
+        text:'',
+        comparisons:greedy.comparisons,
+        swapsTested:opt.swaps,
+        improvementsAccepted:opt.improvements,
+        permutationsChecked:exact.skipped ? 0 : exact.checked,
+        costBefore:opt.initialCost,
+        costAfter:opt.cost,
+        initialTwoOptCost:opt.initialCost,
+        elapsedMs:state.elapsedMs,
+        edges:tourEdges(opt.tour,'current')
+      }];
+      state.stepIndex = 1;
+      setStatus('Done','done');
+      $('phaseNote').textContent = 'Side-by-side comparison mode computed exact, greedy, and 2-Opt results where feasible.';
+      $('explain').innerHTML = `<b>Practical comparison:</b> The 2D map shows the actual city layout and tour overlays. The cards compare tour quality (cost and gap from optimum) and computation (operations and runtime). As n grows, the growth chart explains why exact brute force becomes impractical while nearest-neighbor and 2-Opt remain usable heuristics. ${state.steps[0].explanation}`;
+      updateUI();
+    }
+
+    function comparisonMeta(tour, cost, operations, runtime, B, gap, note){
+      const decision = cost <= B ? 'YES' : 'NO';
+      const gapText = gap === null ? 'n/a: exact skipped' : `${gap >= 0 ? '+' : ''}${gap}`;
+      const ratioText = gap === null ? 'n/a: exact skipped' : `${(cost / (cost - gap)).toFixed(2)}x optimal`;
+      const gapPctText = gap === null ? 'n/a' : `${((gap / (cost - gap)) * 100).toFixed(1)}%`;
+      return `<b>Tour:</b> ${tourNames(tour, false)}<br><b>Cost:</b> ${cost}<br><b>Counted operations:</b> ${operations.toLocaleString()}<br><b>Build runtime:</b> ${formatElapsed(runtime)}<br><b>Decision under B=${B}:</b> ${decision}<br><b>Gap from optimum:</b> ${gapText}<br><b>Approx ratio:</b> ${ratioText}<br><b>Gap percent:</b> ${gapPctText}<br>${note}`;
+    }
+
+    function renderApproximationAnalysis(exact, greedy, opt){
+      $('approxPanel').style.display = 'block';
+      $('compareConceptPanel').style.display = 'block';
+      $('compareConceptContent').innerHTML = `
+        <p>When exact search is too large, larger TSP studies often use <b>lower bounds</b> or special approximation algorithms for metric TSP as reference points.</p>
+        <p>A lower bound is a cost that the true optimum cannot be below. So even when we cannot list every tour, we still try to compare a heuristic tour against an honest benchmark.</p>
+      `;
+      if(exact.skipped){
+        $('approxContent').innerHTML = `
+          <p><b>Formula:</b> approximation ratio = heuristic cost / optimal cost. Gap % = (heuristic cost - optimal cost) / optimal cost × 100.</p>
+          <p>Here exact brute force was skipped because the instance is too large. So this becomes an <b>empirical heuristic comparison</b>: Greedy cost is <span class="math-inline">${greedy.cost}</span>, and Greedy + 2-Opt cost is <span class="math-inline">${opt.cost}</span>. The better heuristic on this run is the one with the smaller tour cost.</p>
+          <p><b>Improvement over Greedy:</b> <span class="math-inline">${greedy.cost > 0 ? (((greedy.cost - opt.cost) / greedy.cost) * 100).toFixed(1) : '0.0'}%</span>. This means local search reduced the greedy tour by that percentage, but it is not a ratio to the unknown optimum.</p>
+          <p><b>Operation counts:</b> Greedy counts distance comparisons. Greedy + 2-Opt counts edge-pair swap tests. These are counted-work indicators for the current run, while build runtime is the browser time needed to compute the result.</p>
+        `;
+        return;
+      }
+      const optimum = exact.cost;
+      const greedyGap = greedy.cost - optimum;
+      const optGap = opt.cost - optimum;
+      const greedyRatio = greedy.cost / optimum;
+      const optRatio = opt.cost / optimum;
+      const greedyPct = greedyGap / optimum * 100;
+      const optPct = optGap / optimum * 100;
+      $('approxContent').innerHTML = `
+        <p><b>Formula:</b> approximation ratio = heuristic cost / optimal cost. Gap % = (heuristic cost - optimal cost) / optimal cost × 100.</p>
+        <p>Exact brute force gives the benchmark cost: <span class="math-inline">${optimum}</span>. Nearest Neighbor has cost <span class="math-inline">${greedy.cost}</span>, so its ratio is <span class="math-inline">${greedy.cost}/${optimum} = ${greedyRatio.toFixed(2)}x</span>. That means Greedy is about <span class="math-inline">${greedyPct.toFixed(1)}%</span> above optimal on this instance.</p>
+        <p>Greedy + 2-Opt has cost <span class="math-inline">${opt.cost}</span>, so its ratio is <span class="math-inline">${opt.cost}/${optimum} = ${optRatio.toFixed(2)}x</span>. Its gap is <span class="math-inline">${optPct.toFixed(1)}%</span>. In simple words: Greedy makes quick local choices, then 2-Opt tries to repair the route by swapping edges when the swap saves distance.</p>
+        <p><b>Operation counts:</b> Greedy counts distance comparisons. Greedy + 2-Opt counts edge-pair swap tests. These are counted-work indicators for the current run, while build runtime is the browser time needed to compute the result.</p>
+        <p>${optGap < greedyGap ? 'Here local search improved the greedy tour and moved it closer to the exact optimum.' : 'Here 2-Opt could not improve the greedy result further, so it stopped at the same local solution.'}</p>
+      `;
+    }
+
+    function twoOptSwap(tour, start, end){
+      return tour.slice(0,start).concat(tour.slice(start,end+1).reverse(), tour.slice(end+1));
+    }
+
+    function buildPlaceholderSteps(){
+      const ids = state.cities.map(c=>c.id);
+      const startId = Number($('startCity').value);
+      const base = [startId, ...ids.filter(id=>id !== startId)];
+      const greedy = nearestPlaceholderTour();
+      const opt = optPlaceholderTour();
+      const B = Number($('bound').value);
+      const steps = [];
+
+      if(state.mode === 'nearest'){
+        steps.push({line:1, city:greedy[0], greedy:[greedy[0]], tour:[greedy[0]], edges:[], text:`Start at ${cityName(greedy[0])}. Nearest Neighbor builds one tour instead of enumerating all tours.`});
+        steps.push({line:3, city:greedy[1], greedy:greedy.slice(0,2), tour:greedy.slice(0,2), edges:[{from:greedy[0],to:greedy[1],state:'candidate',label:'Nearest unvisited candidate'}], text:`Choose a nearest unvisited city. Edge cost = ${edgeWeight(greedy[0],greedy[1])}.`});
+        steps.push({line:5, city:greedy[0], greedy, tour:greedy, edges:tourEdges(greedy,'accepted'), text:`Return to the start city and compute the heuristic cost: ${tourCost(greedy)}.`});
+        steps.push({line:6, city:greedy[0], greedy, tour:greedy, edges:[{from:greedy[greedy.length-1],to:greedy[0],state:tourCost(greedy)<=B?'accepted':'rejected',label:'Heuristic decision check'}], text:'A heuristic YES is useful when cost ≤ B, but a heuristic NO is not a proof.'});
+      } else if(state.mode === 'twoopt'){
+        steps.push({line:0, city:greedy[0], greedy, opt:[], tour:greedy, edges:tourEdges(greedy,'current'), text:'2-Opt begins with an existing tour, usually from Nearest Neighbor.'});
+        steps.push({line:4, city:greedy[2], greedy, opt:greedy, tour:greedy, edges:[{from:greedy[0],to:greedy[1],state:'candidate',label:'First edge under inspection'},{from:greedy[2],to:greedy[3] ?? greedy[0],state:'candidate',label:'Second edge under inspection'}], text:'Inspect a pair of non-adjacent edges. A real 2-Opt step asks whether swapping them shortens the tour.'});
+        steps.push({line:6, city:opt[2] || opt[0], greedy, opt, tour:opt, edges:tourEdges(opt,'accepted'), text:`Example improvement: reverse a middle segment. The displayed cost is now ${tourCost(opt)}.`});
+        steps.push({line:8, city:opt[0], greedy, opt, tour:opt, edges:[{from:opt[1],to:opt[2] ?? opt[0],state:'rejected',label:'No more improving swap'}], text:'Stop when no improving 2-Opt swap remains. This gives a local optimum, not a global proof.'});
+      } else {
+        steps.push({line:1, city:base[0], exact:base, greedy:[], opt:[], tour:base, edges:tourEdges(base,'current'), text:'Build the exact trace. For small n, this is the decision authority.'});
+        steps.push({line:2, city:greedy[1], exact:base, greedy, opt:[], tour:greedy, edges:tourEdges(greedy,'candidate'), text:'Build the greedy trace. It is fast and easy to explain.'});
+        steps.push({line:3, city:opt[2], exact:base, greedy, opt, tour:opt, edges:tourEdges(opt,'accepted'), text:'Build the 2-Opt trace from the greedy tour.'});
+        steps.push({line:5, city:base[0], exact:base, greedy, opt, tour:base, edges:[{from:base[base.length-1],to:base[0],state:tourCost(base)<=B?'accepted':'rejected',label:'Exact decision edge'}], text:'Compare costs side by side. Exact decides; heuristics illustrate practical tradeoffs.'});
+      }
+      state.steps = steps;
+      state.stepIndex = 0;
+      setStatus('Ready','ready');
+      $('phaseNote').textContent = `${steps.length} teaching steps generated. Use Step or Play to walk through them.`;
+      $('explain').innerHTML = '<b>Ready:</b> The teaching trace is prepared for this mode.';
+      updateUI();
+    }
+
+    function applyStep(step){
+      highlightLine(step.activeLine ?? step.line);
+      const fallbackCity = step.tour && step.tour.length ? step.tour[Math.max(0, step.tour.length - 2)] : null;
+      state.activeCityId = Number.isInteger(step.city) ? step.city : fallbackCity;
+      state.activeTour = step.tour || [];
+      state.exactTour = step.bestTour || step.exact || state.exactTour;
+      state.greedyTour = step.greedy || state.greedyTour;
+      state.optTour = step.opt || state.optTour;
+      state.edgeStates = step.edges || [];
+      state.matrixHighlights = step.matrixHighlights || step.edges || [];
+      state.currentCost = Number.isFinite(step.currentCost)
+        ? step.currentCost
+        : (Number.isFinite(step.candidateCost) ? step.candidateCost : (state.activeTour.length ? tourCost(state.activeTour) : null));
+      state.exactBestCost = Number.isFinite(step.bestCost) ? step.bestCost : state.exactBestCost;
+      state.permutationsChecked = Number.isFinite(step.permutationsChecked) ? step.permutationsChecked : state.permutationsChecked;
+      state.comparisonsCount = Number.isFinite(step.comparisons) ? step.comparisons : state.comparisonsCount;
+      state.swapsTested = Number.isFinite(step.swapsTested) ? step.swapsTested : state.swapsTested;
+      state.improvementsAccepted = Number.isFinite(step.improvementsAccepted) ? step.improvementsAccepted : state.improvementsAccepted;
+      state.costBefore = Object.prototype.hasOwnProperty.call(step, 'costBefore') && Number.isFinite(step.costBefore) ? step.costBefore : null;
+      state.costAfter = Object.prototype.hasOwnProperty.call(step, 'costAfter') && Number.isFinite(step.costAfter) ? step.costAfter : null;
+      state.initialTwoOptCost = Number.isFinite(step.initialTwoOptCost) ? step.initialTwoOptCost : state.initialTwoOptCost;
+      state.operationsCount = Number.isFinite(step.operations) ? step.operations : state.operationsCount;
+      state.elapsedMs = Number.isFinite(step.elapsedMs) ? step.elapsedMs : state.elapsedMs;
+      state.unvisitedIds = Array.isArray(step.unvisited) ? step.unvisited.slice() : state.unvisitedIds;
+      const explanation = step.explanation || step.text;
+      $('explain').innerHTML = `<b>Step Explanation:</b> ${explanation}`;
+      $('phaseNote').textContent = explanation;
+      updateUI();
+    }
+
+    function stepOnce(){
+      if(state.mode === 'proof'){
+        renderMainProofMode(proofModeStepIndex+1);
+        setStatus(proofModeStepIndex === PROOF_STEPS.length-1 ? 'Done' : 'Stepping', proofModeStepIndex === PROOF_STEPS.length-1 ? 'done' : 'ready');
+        return;
+      }
+      if(!state.steps.length) buildSteps();
+      if(state.stepIndex >= state.steps.length){
+        setStatus('Done','done');
+        return;
+      }
+      setStatus('Stepping','ready');
+      applyStep(state.steps[state.stepIndex]);
+      state.stepIndex++;
+      updateUI();
+      if(state.stepIndex >= state.steps.length) setStatus('Done','done');
+    }
+
+    function delay(){
+      const speed = Number($('speed').value);
+      return 1200 - speed * 95;
+    }
+
+    async function play(){
+      if(state.mode === 'proof'){
+        state.playing = true;
+        const token = ++state.playToken;
+        setStatus('Playing','playing');
+        while(state.playing && token === state.playToken && proofModeStepIndex < PROOF_STEPS.length-1){
+          renderMainProofMode(proofModeStepIndex+1);
+          await new Promise(resolve=>setTimeout(resolve, delay()));
+        }
+        state.playing = false;
+        setStatus('Done','done');
+        return;
+      }
+      if(!state.steps.length) buildSteps();
+      state.playing = true;
+      const token = ++state.playToken;
+      setStatus('Playing','playing');
+      while(state.playing && token === state.playToken && state.stepIndex < state.steps.length){
+        applyStep(state.steps[state.stepIndex]);
+        state.stepIndex++;
+        updateUI();
+        await new Promise(resolve=>setTimeout(resolve, delay()));
+      }
+      if(state.stepIndex >= state.steps.length){
+        state.playing = false;
+        setStatus('Done','done');
+      }
+    }
+
+    function pause(){
+      state.playing = false;
+      state.playToken++;
+      setStatus('Paused','ready');
+    }
+
+    function reset(){
+      clearTours();
+      if(state.mode === 'proof'){
+        renderMainProofMode(0);
+        $('phaseNote').textContent = 'Proof reset. Step through the reduction from Hamiltonian Cycle to TSP Decision.';
+      }else{
+        $('phaseNote').textContent = 'Reset complete. Click Build Steps to prepare the current mode.';
+        $('explain').innerHTML = '<b>Step Explanation:</b> Reset complete. Build a fresh trace when you are ready.';
+      }
+      updateUI();
+    }
+
+    $('lectureHeader').addEventListener('click', e => {
+      if(e.target.id === 'lectureToggle') return;
+      $('lectureBody').classList.toggle('collapsed');
+      $('lectureToggle').textContent = $('lectureBody').classList.contains('collapsed') ? 'Expand' : 'Collapse';
+    });
+    $('lectureToggle').addEventListener('click', () => {
+      $('lectureBody').classList.toggle('collapsed');
+      $('lectureToggle').textContent = $('lectureBody').classList.contains('collapsed') ? 'Expand' : 'Collapse';
+    });
+    document.querySelectorAll('.modeBtn').forEach(btn=>btn.addEventListener('click',()=>setMode(btn.dataset.mode)));
+    document.querySelectorAll('.proof-tab').forEach(btn=>btn.addEventListener('click',()=>{
+      document.querySelectorAll('.proof-tab').forEach(tab=>tab.classList.toggle('active', tab === btn));
+      document.querySelectorAll('.proof-panel').forEach(panel=>panel.classList.remove('active'));
+      $(`proof-${btn.dataset.proof}`).classList.add('active');
+    }));
+    $('vizProofPrev').addEventListener('click',()=>renderMainProofMode(proofModeStepIndex-1));
+    $('vizProofNext').addEventListener('click',()=>renderMainProofMode(proofModeStepIndex+1));
+    $('proofPreset').addEventListener('change',()=>renderMainProofMode(0));
+    $('preset').addEventListener('change', applyPreset);
+    $('applyCities').addEventListener('click', () => {
+      try{
+        state.cities = parseCities($('cityInput').value);
+        buildWeights();
+        renderStartCities();
+        clearTours();
+        renderMatrix();
+        renderGrowthChart();
+        resetComparisonCards();
+        validateCurrentInput();
+        updateUI();
+        $('phaseNote').textContent = 'Custom cities loaded. Build Steps will use this instance.';
+      }catch(err){
+        $('explain').innerHTML = `<b>Input issue:</b> ${err.message}`;
+      }
+    });
+    $('useWeights').addEventListener('click', () => {
+      buildWeights();
+      renderMatrix();
+      reset();
+      $('phaseNote').textContent = 'Weights rebuilt from Euclidean city coordinates.';
+    });
+    $('speed').addEventListener('input',()=>{$('speedLabel').textContent = `Speed: ${$('speed').value}`;});
+    $('bound').addEventListener('input', ()=>{validateCurrentInput();renderStats();});
+    $('startCity').addEventListener('change', reset);
+    $('tieMode').addEventListener('change', reset);
+    $('build').addEventListener('click', buildSteps);
+    $('step').addEventListener('click', stepOnce);
+    $('play').addEventListener('click', play);
+    $('pause').addEventListener('click', pause);
+    $('reset').addEventListener('click', reset);
+
+    function init(){
+      buildWeights();
+      renderPseudocode();
+      renderStartCities();
+      clearTours();
+      renderMatrix();
+      renderGrowthChart();
+      validateCurrentInput();
+      updateUI();
+    }
+    init();
+  </script>
+</body>
+</html>
